@@ -109,7 +109,7 @@ const AppContent = () => {
       case 'Home':
         return <Home onNavigate={handleNavigate} />;
       case 'Marketplace':
-        return <Marketplace onNavigate={handleNavigate} initialSearch={params.searchQuery} />;
+        return <Marketplace onNavigate={handleNavigate} initialCategory={params.category} initialSearch={params.searchQuery} />;
       case 'ProductDetail':
         return <ProductDetail product={selectedProduct} onNavigate={handleNavigate} />;
       case 'Login':

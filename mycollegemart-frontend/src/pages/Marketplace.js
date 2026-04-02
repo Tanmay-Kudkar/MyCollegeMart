@@ -3,6 +3,53 @@ import { useGlobalState, actionTypes } from '../context/GlobalStateContext';
 import ProductCard from '../components/product/ProductCard';
 import { AcademicCapIcon } from '../components/UI/Icons'; // added
 
+const FALLBACK_PRODUCTS = [
+    {
+        id: 'demo-1',
+        name: 'Engineering Mechanics Notes Bundle',
+        price: 149,
+        imageUrl: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=900&q=80',
+        category: 'Notes',
+        branch: 'Mechanical Engineering',
+        semester: 2,
+        isPrimeExclusive: false,
+        rating: 4.6,
+    },
+    {
+        id: 'demo-2',
+        name: 'DSA Workbook + Previous Papers',
+        price: 299,
+        imageUrl: 'https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&w=900&q=80',
+        category: 'Textbooks',
+        branch: 'Computer Engineering',
+        semester: 3,
+        isPrimeExclusive: false,
+        rating: 4.8,
+    },
+    {
+        id: 'demo-3',
+        name: 'Basic Electronics Lab Kit',
+        price: 999,
+        imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=900&q=80',
+        category: 'Lab Equipment',
+        branch: 'Electronics and Telecommunication Engineering',
+        semester: 4,
+        isPrimeExclusive: false,
+        rating: 4.5,
+    },
+    {
+        id: 'demo-4',
+        name: 'Prime Exclusive: AI Model Training Toolkit',
+        price: 2199,
+        imageUrl: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=900&q=80',
+        category: 'Programming Tools',
+        branch: 'Artificial Intelligence and Data Science',
+        semester: 7,
+        isPrimeExclusive: true,
+        rating: 4.9,
+    },
+];
+
 const Filters = ({ categories, selectedCategory, onSelectCategory, onSortChange, onBranchChange, onSemesterChange, isPrimeMember }) => {
     // Updated engineering branches
     const branches = [
@@ -119,7 +166,16 @@ const Marketplace = ({ onNavigate, initialCategory, initialSearch }) => {
                     dispatch({ type: actionTypes.FETCH_PRODUCTS_SUCCESS, payload: response.data });
                 })
                 .catch(error => {
-                    dispatch({ type: actionTypes.FETCH_PRODUCTS_FAIL, payload: error.toString() });
+                    const unreachable = /Failed to fetch|Network Error|ERR_CONNECTION_REFUSED/i.test(String(error));
+                    if (unreachable) {
+                        dispatch({ type: actionTypes.FETCH_PRODUCTS_SUCCESS, payload: FALLBACK_PRODUCTS });
+                        dispatch({
+                            type: actionTypes.ADD_NOTIFICATION,
+                            payload: { message: 'Backend is offline. Showing demo products.', type: 'error' }
+                        });
+                    } else {
+                        dispatch({ type: actionTypes.FETCH_PRODUCTS_FAIL, payload: error.toString() });
+                    }
                 });
         }
     }, [status, dispatch, state.products.api]);

@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-export const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8080/api";
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.REACT_APP_API_URL ||
+  "http://localhost:8080/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -63,7 +66,7 @@ export const auth = {
       console.error("Google login API error:", error);
       
       // If backend is unreachable in development, provide fallback authentication for testing
-      if (process.env.NODE_ENV === 'development' && error.message.includes('Failed to fetch')) {
+      if (import.meta.env.DEV && error.message.includes('Failed to fetch')) {
         console.warn("Backend unreachable - using development fallback authentication");
         
         // Mock successful auth response

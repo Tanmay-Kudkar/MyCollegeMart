@@ -1,6 +1,64 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { AcademicCapIcon } from '../components/UI/Icons';
+import { ENGINEERING_BRANCHES } from '../utils/constants';
+
+const SKILL_SERVICES = [
+  {
+    id: 'svc-1',
+    title: 'Digital Electronics Assignment Review',
+    type: 'Assignment',
+    description: 'Detailed review with corrections and explanation notes for submission.',
+    price: 99,
+    branch: 'Electronics and Telecommunication Engineering',
+    semester: 4,
+  },
+  {
+    id: 'svc-2',
+    title: 'Data Structures Practical Guidance',
+    type: 'Practical',
+    description: 'Step-by-step coding support with viva preparation pointers.',
+    price: 149,
+    branch: 'Computer Engineering',
+    semester: 3,
+  },
+  {
+    id: 'svc-3',
+    title: 'Engineering Maths Tutoring Session',
+    type: 'Tutoring',
+    description: 'One-on-one session focused on difficult modules and problem solving.',
+    price: 199,
+    branch: 'All Branches',
+    semester: 2,
+  },
+  {
+    id: 'svc-4',
+    title: 'Mini Project Architecture Consultation',
+    type: 'Project',
+    description: 'Project planning support including tech stack and milestone roadmap.',
+    price: 299,
+    branch: 'Information Technology',
+    semester: 6,
+  },
+  {
+    id: 'svc-5',
+    title: 'Mechanics Lab Journal Completion Help',
+    type: 'Practical',
+    description: 'Format correction and experiment write-up guidance for timely submission.',
+    price: 129,
+    branch: 'Mechanical Engineering',
+    semester: 3,
+  },
+  {
+    id: 'svc-6',
+    title: 'AI/ML Assignment Debug Session',
+    type: 'Assignment',
+    description: 'Hands-on debugging and model result interpretation support.',
+    price: 249,
+    branch: 'Artificial Intelligence and Data Science',
+    semester: 7,
+  },
+];
 
 const ServiceCard = ({ service, onSelect }) => (
   <motion.div
@@ -41,7 +99,7 @@ const Filters = ({ onFilterChange, currentFilters }) => {
       <div>
         <h4 className="font-semibold mb-2 text-slate-700 dark:text-slate-300">Branch</h4>
         <select onChange={(e) => onFilterChange('branch', e.target.value)} value={currentFilters.branch} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-800">
-          {engineeringBranches.map(b => <option key={b} value={b}>{b}</option>)}
+          {ENGINEERING_BRANCHES.map((branch) => <option key={branch} value={branch}>{branch}</option>)}
         </select>
       </div>
       <div>
@@ -54,7 +112,7 @@ const Filters = ({ onFilterChange, currentFilters }) => {
   );
 };
 
-const SkillMarketplace = () => {
+const SkillMarketplace = ({ onNavigate }) => {
   const [services, setServices] = useState([]);
   const [status, setStatus] = useState('idle');
   const [filters, setFilters] = useState({
@@ -62,14 +120,15 @@ const SkillMarketplace = () => {
     branch: 'All Branches',
     semester: 'All',
   });
+
   useEffect(() => {
     setStatus('loading');
-    mockFirebase.firestore.getServices()
-      .then(data => {
-        setServices(data);
-        setStatus('succeeded');
-      })
-      .catch(() => setStatus('failed'));
+    const timer = setTimeout(() => {
+      setServices(SKILL_SERVICES);
+      setStatus('succeeded');
+    }, 200);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const handleFilterChange = (key, value) => {
@@ -95,7 +154,7 @@ const SkillMarketplace = () => {
           filteredServices.length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
               {filteredServices.map(service => (
-                <ServiceCard key={service.id} service={service} onSelect={() => { /* Navigate to service detail */ }} />
+                <ServiceCard key={service.id} service={service} onSelect={() => onNavigate?.('AssignmentHelp', { service })} />
               ))}
             </div>
           ) : (
@@ -105,6 +164,7 @@ const SkillMarketplace = () => {
             </div>
           )
         )}
+        {status === 'failed' && <p className="text-red-500">Unable to load services right now.</p>}
       </main>
     </div>
   );

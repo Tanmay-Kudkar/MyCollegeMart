@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
+import { useGlobalState, actionTypes } from '../context/GlobalStateContext';
 
 const PrimeMembership = ({ onNavigate }) => {
   const { state, dispatch } = useGlobalState();
