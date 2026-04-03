@@ -26,8 +26,12 @@ import Terms from '../pages/Info/Terms';
 import SkillMarketplace from '../pages/SkillMarketplace';
 import AIChatbot from './common/AIChatbot';
 import AssignmentHelp from '../pages/services/AssignmentHelp';
+import { useGlobalState, actionTypes } from '../context/GlobalStateContext';
+import { auth } from '../utils/api';
 
 const AppContent = () => {
+  const { dispatch } = useGlobalState();
+
   // Persist page + params + selected product
   const [currentPage, setCurrentPage] = useState(() => localStorage.getItem('mcm.currentPage') || 'Home');
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -40,6 +44,53 @@ const AppContent = () => {
   });
   // const [pageData, setPageData] = useState(null);
   // const { state } = useGlobalState();
+
+  // Handle backend OAuth redirect: /#token=... or /#authError=...
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash || hash.length <= 1) {
+      return;
+    }
+
+    const paramsFromHash = new URLSearchParams(hash.slice(1));
+    const tokenFromHash = paramsFromHash.get('token');
+    const authError = paramsFromHash.get('authError');
+
+    if (authError) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Google sign-in failed. Please try again.', type: 'error' }
+      });
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      return;
+    }
+
+    if (!tokenFromHash) {
+      return;
+    }
+
+    localStorage.setItem('token', tokenFromHash);
+
+    auth.getCurrentUser()
+      .then((userProfile) => {
+        localStorage.setItem('user', JSON.stringify(userProfile));
+        dispatch({ type: actionTypes.SET_USER, payload: userProfile });
+        setCurrentPage('Home');
+        setParams({});
+        localStorage.setItem('mcm.currentPage', 'Home');
+        localStorage.setItem('mcm.pageParams', '{}');
+      })
+      .catch(() => {
+        localStorage.removeItem('token');
+        dispatch({
+          type: actionTypes.ADD_NOTIFICATION,
+          payload: { message: 'Google sign-in failed. Please try again.', type: 'error' }
+        });
+      })
+      .finally(() => {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      });
+  }, [dispatch]);
 
   const setHistory = (updater) => {
     try {

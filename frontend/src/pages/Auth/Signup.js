@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { GoogleLogin } from '@react-oauth/google';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import { auth } from '../../utils/api';
 
@@ -42,36 +41,9 @@ const Signup = ({ onNavigate }) => {
         setIsLoading(false);
     };
 
-    const handleGoogleSuccess = async (credentialResponse) => {
-        setIsLoading(true);
+    const handleGoogleSignUp = () => {
         setError('');
-        try {
-            // Step 1: Send Google token to backend. Backend creates the account if new.
-            const response = await auth.googleLogin({ token: credentialResponse.credential });
-            localStorage.setItem('token', response.token);
-            
-            // Step 2: Fetch the new user's profile from our backend.
-            const userProfile = await auth.getCurrentUser();
-            
-            // ✅ 3. CRITICAL FIX: Save the user profile to localStorage.
-            // This is required for the session to be restored on page refresh.
-            localStorage.setItem('user', JSON.stringify(userProfile));
-            
-            // Step 4: Update the global state to reflect the login immediately.
-            dispatch({ type: actionTypes.SET_USER, payload: userProfile });
-            
-            onNavigate('Home');
-
-        } catch (err) {
-            console.error("Google sign-in error:", err);
-            setError(err.message || "Google sign-up failed");
-        }
-        setIsLoading(false);
-    };
-
-    const handleGoogleError = () => {
-        console.error("Google Sign-Up Failed");
-        setError("Google sign-up failed");
+        auth.startGoogleLogin();
     };
 
     return (
@@ -128,14 +100,13 @@ const Signup = ({ onNavigate }) => {
                     </div>
                 </div>
                 <div className="w-full">
-                    <GoogleLogin
-                        onSuccess={handleGoogleSuccess}
-                        onError={handleGoogleError}
-                        width={300}
-                        text="signup_with"
-                        shape="rectangular"
-                        theme="filled_blue"
-                    />
+                    <button
+                        type="button"
+                        onClick={handleGoogleSignUp}
+                        className="w-full py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-900 font-medium border border-slate-300"
+                    >
+                        Sign up with Google
+                    </button>
                 </div>
                 <div className="mt-4 text-center">
                     <p className="text-sm text-gray-600 dark:text-gray-300">

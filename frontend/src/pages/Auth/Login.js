@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { GoogleLogin } from '@react-oauth/google';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import { auth } from '../../utils/api';
 
@@ -34,36 +33,9 @@ const Login = ({ onNavigate }) => {
         setIsLoading(false);
     };
 
-    const handleGoogleSuccess = async (credentialResponse) => {
-        setIsLoading(true);
+    const handleGoogleSignIn = () => {
         setError('');
-        try {
-            // Step 1: Send Google token to backend, get our app's token back.
-            const response = await auth.googleLogin({ token: credentialResponse.credential });
-            localStorage.setItem('token', response.token);
-
-            // Step 2: Fetch the full user profile from our backend.
-            const userProfile = await auth.getCurrentUser();
-            
-            // ✅ 3. CRITICAL FIX: Save the user profile to localStorage.
-            // This is required for the session to be restored on page refresh.
-            localStorage.setItem('user', JSON.stringify(userProfile));
-            
-            // Step 4: Update the global state to reflect the login immediately.
-            dispatch({ type: actionTypes.SET_USER, payload: userProfile });
-            
-            onNavigate('Home');
-
-        } catch (err) {
-            console.error("Google sign-in error:", err);
-            setError(err.message || "Google sign-in failed");
-        }
-        setIsLoading(false);
-    };
-
-    const handleGoogleError = () => {
-        console.error("Google Login Failed");
-        setError("Google sign-in failed");
+        auth.startGoogleLogin();
     };
 
     return (
@@ -120,14 +92,13 @@ const Login = ({ onNavigate }) => {
                     </div>
                 </div>
                 <div className="w-full">
-                    <GoogleLogin
-                        onSuccess={handleGoogleSuccess}
-                        onError={handleGoogleError}
-                        width={300}
-                        text="signin_with"
-                        shape="rectangular"
-                        theme="filled_blue"
-                    />
+                    <button
+                        type="button"
+                        onClick={handleGoogleSignIn}
+                        className="w-full py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-900 font-medium border border-slate-300"
+                    >
+                        Continue with Google
+                    </button>
                 </div>
             </motion.div>
             <div className="mt-4 text-center">

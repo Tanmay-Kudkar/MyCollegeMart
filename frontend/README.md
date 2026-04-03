@@ -2,10 +2,11 @@
 
 ## Environment Variables
 
-Set the Google OAuth client ID in your frontend environment:
+Frontend no longer needs Google client ID or client secret for authentication.
 
-- VITE_MYCOLLEGEMART_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+- Google OAuth is started from backend endpoint: /api/auth/google/start
+- Configure Google OAuth only in backend environment variables.
 
-Optional compatibility fallback:
+Recommended frontend variable:
 
-- REACT_APP_MYCOLLEGEMART_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+- VITE_API_URL=https://your-backend-domain/api

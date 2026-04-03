@@ -46,44 +46,8 @@ export const auth = {
       throw new Error(error.response?.data?.message || "Failed to fetch user");
     }
   },
-  googleLogin: async ({ token, clientId }) => {   // ✅ fixed destructuring
-    try {
-      // Send token field as expected by backend
-      const response = await fetch(`${API_BASE_URL}/auth/google`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token, clientId }),   // ✅ backend receives { token: "..." }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error("Google login API error:", error);
-      
-      // If backend is unreachable in development, provide fallback authentication for testing
-      if (import.meta.env.DEV && error.message.includes('Failed to fetch')) {
-        console.warn("Backend unreachable - using development fallback authentication");
-        
-        // Mock successful auth response
-        return {
-          success: true,
-          user: {
-            id: 'dev-user-1',
-            displayName: 'Dev User',
-            email: 'dev@example.com',
-            isPrimeMember: false,
-          },
-          token: 'dev-token-123'
-        };
-      }
-      
-      throw new Error('Google sign-in failed');
-    }
+  startGoogleLogin: () => {
+    window.location.assign(`${API_BASE_URL}/auth/google/start`);
   },
 };
 
