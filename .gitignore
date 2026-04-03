@@ -16,20 +16,20 @@ Thumbs.db
 # ---------------------------
 # Node / React (Frontend)
 # ---------------------------
-mycollegemart-frontend/node_modules/
-mycollegemart-frontend/.cache/
-mycollegemart-frontend/build/
-mycollegemart-frontend/.env
+frontend/node_modules/
+frontend/.cache/
+frontend/build/
+frontend/.env
 
 # ---------------------------
 # Java / Spring Boot (Backend)
 # ---------------------------
-mycollegemart-backend/target/
-mycollegemart-backend/.env
-mycollegemart-backend/.idea/
-mycollegemart-backend/.classpath
-mycollegemart-backend/.project
-mycollegemart-backend/.settings/
+backend/target/
+backend/.env
+backend/.idea/
+backend/.classpath
+backend/.project
+backend/.settings/
 
 # ---------------------------
 # General build outputs
