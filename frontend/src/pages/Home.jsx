@@ -1,210 +1,90 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { useGlobalState, actionTypes } from '../context/GlobalStateContext';
+import { useGlobalState } from '../context/GlobalStateContext';
+import FlashDealBanner from '../components/common/FlashDealBanner';
+import ProductCard from '../components/product/ProductCard';
 
-const PrimeMembership = ({ onNavigate }) => {
-  const { state, dispatch } = useGlobalState();
-  const [showExtraFeatures, setShowExtraFeatures] = useState(false);
-  
-  const primeProduct = {
-    id: 'prime-membership',
-    name: 'MyCollegeMart Prime Membership',
-    price: 299,
-    description: 'Annual subscription for exclusive benefits and features.',
-    imageUrl: 'https://placehold.co/300x300/f0abfc/1e1b4b?text=Prime',
-    category: 'Membership',
-    isPrime: true
-  };
+const Home = ({ onNavigate }) => {
+  const { state } = useGlobalState();
 
-  const handleAddToCart = () => {
-    if (state.cart?.items?.['prime-membership']) {
-      dispatch({
-        type: actionTypes.ADD_NOTIFICATION,
-        payload: { message: 'Prime Membership can only be added once.', type: 'error' }
-      });
-      return;
-    }
-    dispatch({ type: actionTypes.ADD_TO_CART, payload: primeProduct });
-    dispatch({
-      type: actionTypes.ADD_NOTIFICATION,
-      payload: { message: 'Prime Membership added to cart!', type: 'success' }
-    });
-  };
-
-  const FeatureCard = ({ title, children, icon }) => (
-    <motion.div
-      whileHover={{ y: -5, boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }}
-      className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 h-full"
-    >
-      <div className="flex items-center gap-3 mb-3">
-        <span className="text-2xl">{icon}</span>
-        <h3 className="text-xl font-semibold text-slate-900 dark:text-white">{title}</h3>
-      </div>
-      <p className="text-slate-600 dark:text-slate-400">{children}</p>
-    </motion.div>
-  );
+  const featuredProducts = useMemo(() => {
+    const items = Array.isArray(state.products?.items) ? state.products.items : [];
+    return items.slice(0, 6);
+  }, [state.products?.items]);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900 py-12">
-      <div className="max-w-6xl mx-auto">
-        {/* Header section with new gradient and layout */}
-        <div className="relative bg-gradient-to-br from-indigo-900 via-fuchsia-900 to-slate-900 px-8 py-16 rounded-2xl overflow-hidden text-center">
-          <div 
-            className="absolute inset-0" 
-            style={{ 
-              backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path fill='%23a855f7' opacity='0.05' d='M0 50L50 0L100 50L50 100z'/></svg>")`,
-              backgroundSize: '20px 20px' 
-            }}
-          ></div>
-          
-          {/* left-to-right sweep glow animation */}
-          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg z-10" aria-hidden="true">
-            <span
-              className="absolute top-0 bottom-0 left-0 w-full"
-              style={{
-                background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0) 100%)',
-                filter: 'blur(8px)',
-                animation: 'bannerSweep 3s linear infinite'
-              }}
-            />
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="relative z-10"
-          >
-            <h1 className="text-5xl md:text-6xl font-extrabold text-white drop-shadow-lg">MyCollegeMart Prime</h1>
-            <p className="mt-4 text-lg text-white/80 max-w-2xl mx-auto">Unlock exclusive benefits designed for engineering students.</p>
-            <div className="mt-8">
-              <motion.button 
-                onClick={handleAddToCart}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-10 py-4 bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white font-bold rounded-full transition-all shadow-2xl"
-                title="Add Prime Membership to your cart"
-              >
-                Join Prime — ₹299/year
-              </motion.button>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Main content */}
-        <div className="p-4 md:p-8 space-y-12">
-          {/* Core benefits */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <FeatureCard icon="🚚" title="Free Campus Delivery">Get your items delivered to your hostel or campus pickup points for free.</FeatureCard>
-            <FeatureCard icon="⏳" title="Early Access">Get a 24-hour head start on newly listed textbooks and popular items.</FeatureCard>
-            <FeatureCard icon="💰" title="Exclusive Deals">Special discounts on stationery, gadgets, and premium listings.</FeatureCard>
-          </div>
-
-          {/* Expandable section for additional features */}
-          <div>
-            <button 
-              onClick={() => setShowExtraFeatures(!showExtraFeatures)}
-              className="w-full py-5 text-left flex justify-between items-center bg-slate-100 dark:bg-slate-800 rounded-xl px-6 hover:bg-slate-200 dark:hover:bg-slate-700/70 text-slate-900 dark:text-white transition-all"
-              title={showExtraFeatures ? 'Hide extra features' : 'Show more Prime features'}
+    <div className="space-y-8">
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-950 via-indigo-900 to-slate-900 p-8 md:p-12 text-white shadow-lg">
+        <div className="relative z-10 max-w-3xl">
+          <h1 className="text-4xl md:text-5xl font-extrabold">Buy, Sell, and Save on Campus</h1>
+          <p className="mt-3 text-white/80 text-lg">
+            Discover books, gadgets, lab items, and student essentials in one trusted campus marketplace.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              onClick={() => onNavigate('Marketplace')}
+              className="px-5 py-3 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold"
             >
-              <span className="text-xl font-semibold">Explore More Prime Features</span>
-              <motion.span animate={{ rotate: showExtraFeatures ? 45 : 0 }} className="text-2xl font-light">+</motion.span>
+              Explore Marketplace
             </button>
-            
-            {showExtraFeatures && (
-              <motion.div 
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                transition={{ duration: 0.35, ease: "easeOut" }}
-                className="mt-6 space-y-6 overflow-hidden"
-              >
-                <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-xl">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-xl font-semibold mb-2">Assignment & Practical Help</h3>
-                      <p className="text-slate-600 dark:text-slate-400">Get expert help with assignments and practicals at special Prime member rates.</p>
-                    </div>
-                    <span className="text-fuchsia-500 dark:text-fuchsia-400 font-semibold whitespace-nowrap ml-4">PRIME BENEFIT</span>
-                  </div>
-                  
-                  <div className="mt-4 space-y-3 border-t border-slate-200 dark:border-slate-700 pt-4">
-                    <div className="flex justify-between items-center">
-                      <span>Standard Deadline (7 days)</span>
-                      <div className="text-right">
-                        <span className="font-semibold">₹99</span>
-                        <span className="text-xs text-slate-500 line-through ml-2">₹149</span>
-                        <span className="text-xs text-green-500 ml-2">Save ₹50</span>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>Express Deadline (3 days)</span>
-                      <div className="text-right">
-                        <span className="font-semibold">₹149</span>
-                        <span className="text-xs text-slate-500 line-through ml-2">₹249</span>
-                        <span className="text-xs text-green-500 ml-2">Save ₹100</span>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>Urgent Deadline (24 hours)</span>
-                      <div className="text-right">
-                        <span className="font-semibold">₹249</span>
-                        <span className="text-xs text-slate-500 line-through ml-2">₹399</span>
-                        <span className="text-xs text-green-500 ml-2">Save ₹150</span>
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => onNavigate('AssignmentHelp')}
-                    className="mt-4 w-full py-2 bg-fuchsia-600 text-white font-semibold rounded-lg hover:bg-fuchsia-700 transition"
-                  >
-                    Request Assignment Help
-                  </button>
-                </div>
-                
-                <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-xl">
-                  <h3 className="text-xl font-semibold mb-2 text-slate-900 dark:text-white">Exclusive Access to Premium Listings</h3>
-                  <p className="text-slate-600 dark:text-slate-400">Some high-demand items are exclusively available to Prime members.</p>
-                </div>
-                
-                <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-xl">
-                  <h3 className="text-xl font-semibold mb-2 text-slate-900 dark:text-white">Priority Support</h3>
-                  <p className="text-slate-600 dark:text-slate-400">Get faster responses to your questions and support requests.</p>
-                </div>
-              </motion.div>
-            )}
-          </div>
-
-          {/* FAQ section */}
-          <div className="border-t border-slate-200 dark:border-slate-700 pt-12">
-            <h2 className="text-3xl font-bold mb-8 text-center text-slate-900 dark:text-white">Frequently Asked Questions</h2>
-            
-            <div className="max-w-3xl mx-auto space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">How do I get started?</h3>
-                <p className="text-slate-600 dark:text-slate-400 mt-1">Simply add the membership to your cart and checkout. Your membership benefits will be activated immediately after payment.</p>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">How will I know if I'm a Prime member?</h3>
-                <p className="text-slate-600 dark:text-slate-400 mt-1">Your account page will display a special golden theme indicating your Prime status.</p>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">What payment methods are accepted?</h3>
-                <p className="text-slate-600 dark:text-slate-400 mt-1">We accept online payments through RazorPay and also offer Cash on Delivery options for physical goods.</p>
-              </div>
-            </div>
+            <button
+              onClick={() => onNavigate('Sell')}
+              className="px-5 py-3 rounded-lg border border-white/30 hover:bg-white/10 text-white font-semibold"
+            >
+              Sell an Item
+            </button>
+            <button
+              onClick={() => onNavigate('PrimeMembership')}
+              className="px-5 py-3 rounded-lg border border-fuchsia-300/40 hover:bg-fuchsia-500/20 text-fuchsia-100 font-semibold"
+            >
+              View Prime Benefits
+            </button>
           </div>
         </div>
-      </div>
-      <style>{`
-        @keyframes bannerSweep {
-          0%   { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-      `}</style>
+      </section>
+
+      <FlashDealBanner onNavigate={onNavigate} />
+
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Featured Products</h2>
+          <button
+            onClick={() => onNavigate('Marketplace')}
+            className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
+          >
+            View all
+          </button>
+        </div>
+
+        {featuredProducts.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {featuredProducts.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                compact
+                onProductSelect={(selected) => onNavigate('ProductDetail', selected)}
+              />
+            ))}
+          </div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6"
+          >
+            <p className="text-slate-600 dark:text-slate-300">No products loaded yet. Visit Marketplace to browse listings.</p>
+            <button
+              onClick={() => onNavigate('Marketplace')}
+              className="mt-4 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+            >
+              Go to Marketplace
+            </button>
+          </motion.div>
+        )}
+      </section>
     </div>
   );
 };
 
-export default PrimeMembership;
+export default Home;

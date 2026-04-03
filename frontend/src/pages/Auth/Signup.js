@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { GoogleLogin } from '@react-oauth/google';
-// ✅ 1. Import useNavigate for smooth, client-side navigation.
-import { useNavigate } from 'react-router-dom';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import { auth } from '../../utils/api';
 
@@ -12,8 +10,6 @@ const Signup = ({ onNavigate }) => {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const { dispatch } = useGlobalState();
-    // ✅ 2. Initialize the navigate function.
-    const navigate = useNavigate();
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -38,8 +34,7 @@ const Signup = ({ onNavigate }) => {
             localStorage.setItem('user', JSON.stringify(userProfile));
             dispatch({ type: actionTypes.SET_USER, payload: userProfile });
             
-            // ✅ 4. Use navigate for a better user experience.
-            navigate('/');
+            onNavigate('Home');
         } catch (err) {
             console.error("Registration error:", err);
             setError(err.message || "Failed to create account.");
@@ -65,8 +60,7 @@ const Signup = ({ onNavigate }) => {
             // Step 4: Update the global state to reflect the login immediately.
             dispatch({ type: actionTypes.SET_USER, payload: userProfile });
             
-            // ✅ 4. BEST PRACTICE: Use navigate('/') for a smooth redirect without a full page reload.
-            navigate('/');
+            onNavigate('Home');
 
         } catch (err) {
             console.error("Google sign-in error:", err);
