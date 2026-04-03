@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: mycollegemart-frontend
+    name: frontend
     env: static
-    buildCommand: npm install && npm run build
-    staticPublishPath: ./build
+    buildCommand: npm run build
+    staticPublishPath: ./dist
     routes:
       - type: rewrite
         source: /*

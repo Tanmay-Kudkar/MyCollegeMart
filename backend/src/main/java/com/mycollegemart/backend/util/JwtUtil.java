@@ -21,10 +21,15 @@ public class JwtUtil {
     private final SecretKey key; // ✅ A secure, cryptographic key object.
 
     /**
-     * ✅ BEST PRACTICE: Use constructor injection to receive configuration properties.
+     * ✅ BEST PRACTICE: Use constructor injection to receive configuration
+     * properties.
      * This ensures the utility is correctly configured upon creation.
      */
     public JwtUtil(@Value("${jwt.secret}") String secret, @Value("${jwt.expiration}") long expiration) {
+        if (secret == null || secret.length() < 32) {
+            throw new IllegalStateException("JWT_SECRET must be at least 32 characters long");
+        }
+
         this.EXPIRATION_TIME = expiration;
 
         // ✅ FIX: Create a cryptographically secure key from the secret string.

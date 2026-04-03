@@ -4,6 +4,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,16 +27,18 @@ public class AuthController {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
 
-    // ⚠️ Make sure this matches your Web Client ID from Google Cloud Console
-    private static final String GOOGLE_CLIENT_ID = "30561089880-65f9jvksmah2ki6k6fkolb7rijqcmmo7.apps.googleusercontent.com";
-
     private final UserService userService;
     private final JwtUtil jwtUtil;
+    private final String googleClientId;
 
     @Autowired
-    public AuthController(UserService userService, JwtUtil jwtUtil) {
+    public AuthController(
+            UserService userService,
+            JwtUtil jwtUtil,
+            @Value("${google.clientId}") String googleClientId) {
         this.userService = userService;
         this.jwtUtil = jwtUtil;
+        this.googleClientId = googleClientId;
     }
 
     @PostMapping("/google")
@@ -47,11 +50,17 @@ public class AuthController {
                     .body("Missing Google token in request body");
         }
 
+        if (googleClientId == null || googleClientId.isBlank()) {
+            logger.error("Google OAuth client ID is not configured");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Google OAuth is not configured");
+        }
+
         try {
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
                     GoogleNetHttpTransport.newTrustedTransport(),
                     GsonFactory.getDefaultInstance())
-                    .setAudience(Collections.singletonList(GOOGLE_CLIENT_ID))
+                    .setAudience(Collections.singletonList(googleClientId))
                     .build();
 
             GoogleIdToken idToken = verifier.verify(token);
@@ -96,7 +105,8 @@ public class AuthController {
     }
 
     @GetMapping("/user")
-    public ResponseEntity<?> getCurrentUser(@RequestHeader(name = "Authorization", required = false) String authHeader) {
+    public ResponseEntity<?> getCurrentUser(
+            @RequestHeader(name = "Authorization", required = false) String authHeader) {
         try {
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token");
