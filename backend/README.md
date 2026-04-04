@@ -34,6 +34,11 @@ Common variables:
 Master login notes:
 - When APP_MASTER_EMAIL and APP_MASTER_PASSWORD are set, backend bootstraps a master user with full access (admin + listing + skill service creation).
 - Use frontend login portal "Master" for this account.
+- Master account is system-managed and cannot be created via signup.
+- Master account supports email/password login only (Google sign-in is blocked).
+- If env vars are not provided, development defaults are used:
+	- Email: master@mycollegemart.local
+	- Password: Master@1234
 
 ## Run
 Windows PowerShell:

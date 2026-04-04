@@ -284,13 +284,16 @@ const Navbar = ({ onCartClick, onNavigate }) => {
               aria-label="Go to Home"
               title="Home"
             >
-              <span className="inline-flex items-center justify-center rounded-full bg-white dark:bg-slate-900 border-2 border-indigo-500 dark:border-indigo-400 mr-3"
-                    style={{ width: 44, height: 44, overflow: 'hidden' }}>
-                <img
-                  src="/MyCollegeMart-Icon.jpg"
-                  alt="MyCollegeMart Icon"
-                  className="w-full h-full object-cover"
-                />
+              <span className="mr-3 inline-flex items-center justify-center">
+                <span className="inline-flex h-[46px] w-[46px] items-center justify-center rounded-full border-[3px] border-indigo-400/90 p-[2px] dark:border-indigo-300/80">
+                  <span className="inline-flex h-full w-full items-center justify-center rounded-full border-2 border-amber-500 bg-white p-[1px]">
+                    <img
+                      src="/MyCollegeMart-Icon.jpg"
+                      alt="MyCollegeMart Icon"
+                      className="h-full w-full rounded-full object-cover"
+                    />
+                  </span>
+                </span>
               </span>
               {/* Neutral brand wordmark (no dot, no blue) */}
               <span className="brand-wordmark hidden text-[22px] font-semibold tracking-tight text-slate-900 dark:text-white sm:inline md:text-[26px]">

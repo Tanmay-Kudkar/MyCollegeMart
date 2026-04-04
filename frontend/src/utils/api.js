@@ -282,6 +282,10 @@ export const products = {
     ...response,
     data: normalizeMediaCollection(response.data),
   })),
+  getQuestions: (id) => api.get(`/products/${id}/questions`),
+  askQuestion: (id, question) => api.post(`/products/${id}/questions`, { question }),
+  answerQuestion: (productId, questionId, answer) =>
+    api.post(`/products/${productId}/questions/${questionId}/answers`, { answer }),
   getByBranch: (branch, page = 0, size = 12) => 
     api.get(`/products/branch/${branch}?page=${page}&size=${size}`),
   search: (query) => 

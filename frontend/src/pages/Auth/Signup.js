@@ -60,7 +60,7 @@ const Signup = ({ onNavigate, defaultAccountType }) => {
                 transition={{ duration: 0.4 }}
                 className="mx-auto grid w-full max-w-6xl items-stretch gap-6 lg:grid-cols-[1.1fr_minmax(0,460px)]"
             >
-                <section className="hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm dark:border-slate-700 dark:from-slate-800 dark:to-slate-900 lg:flex lg:flex-col lg:justify-between">
+                <section className="hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm dark:border-slate-700 dark:from-slate-800 dark:to-slate-900 lg:flex lg:flex-col">
                     <div>
                         <p className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:border-cyan-800/50 dark:bg-cyan-900/30 dark:text-cyan-300">
                             Start Selling Or Shopping
@@ -69,6 +69,21 @@ const Signup = ({ onNavigate, defaultAccountType }) => {
                         <p className="mt-3 text-slate-600 dark:text-slate-300">
                             Join a verified campus marketplace for study materials, tools, and student services. Switch between individual and merchant workflows anytime.
                         </p>
+                    </div>
+
+                    <div className="my-6 flex flex-1 items-center justify-center rounded-[30px] border border-slate-200/80 bg-gradient-to-br from-slate-100 via-white to-cyan-50 p-8 dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-cyan-950/40">
+                        <div className="relative">
+                            <div className="absolute -inset-7 rounded-full bg-cyan-400/15 blur-3xl dark:bg-cyan-500/20" aria-hidden="true" />
+                            <div className="relative h-56 w-56 rounded-full border-[6px] border-indigo-400/90 p-[6px] shadow-2xl shadow-cyan-900/20 dark:border-indigo-300/80">
+                                <div className="h-full w-full rounded-full border-[5px] border-amber-500 bg-white p-2">
+                                    <img
+                                        src="/MyCollegeMart-Icon.jpg"
+                                        alt="MyCollegeMart Logo"
+                                        className="h-full w-full rounded-full object-contain"
+                                    />
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">

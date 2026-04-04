@@ -37,6 +37,8 @@ const SellerDashboard = ({ onNavigate }) => {
     return allListings.filter((item) => Number(item?.listedByUserId) === currentUserId);
   }, [dashboard, state.user?.id]);
 
+  const unansweredQuestions = Number(dashboard?.unansweredQuestions || 0);
+
   if (!state.isLoggedIn) {
     return (
       <div className="py-12 text-center">
@@ -98,7 +100,7 @@ const SellerDashboard = ({ onNavigate }) => {
     <div className="max-w-5xl mx-auto py-8 px-4">
       <h1 className="text-4xl font-extrabold text-slate-900 dark:text-white">Seller Dashboard</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mt-8">
         <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-center shadow-sm">
           <p className="text-sm text-slate-500 dark:text-slate-400">Total Sales</p>
           <p className="text-3xl font-bold text-slate-800 dark:text-white">₹{Number(dashboard?.estimatedSales || 0).toLocaleString()}</p>
@@ -110,6 +112,12 @@ const SellerDashboard = ({ onNavigate }) => {
         <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-center shadow-sm">
           <p className="text-sm text-slate-500 dark:text-slate-400">Seller Rating</p>
           <p className="text-3xl font-bold text-slate-800 dark:text-white">{Number(dashboard?.averageRating || 0).toFixed(1)}/5</p>
+        </div>
+        <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-center shadow-sm">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Open Q&amp;A</p>
+          <p className={`text-3xl font-bold ${unansweredQuestions > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-800 dark:text-white'}`}>
+            {unansweredQuestions}
+          </p>
         </div>
       </div>
 
@@ -128,17 +136,27 @@ const SellerDashboard = ({ onNavigate }) => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {listings.map((item) => (
             <div key={item.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 shadow-sm">
-              {item.imageUrl ? (
-                <img src={item.imageUrl} alt={item.name} className="w-full h-40 object-cover rounded-md" />
-              ) : (
-                <div className="w-full h-40 rounded-md bg-gradient-to-br from-cyan-600 via-indigo-700 to-slate-900" />
-              )}
+              <div className="relative">
+                {item.imageUrl ? (
+                  <img src={item.imageUrl} alt={item.name} className="w-full h-40 object-cover rounded-md" />
+                ) : (
+                  <div className="w-full h-40 rounded-md bg-gradient-to-br from-cyan-600 via-indigo-700 to-slate-900" />
+                )}
+                {Number(item.openQuestionCount || 0) > 0 && (
+                  <span className="absolute right-2 top-2 rounded-full bg-amber-500 px-2 py-1 text-[11px] font-semibold text-slate-900 shadow">
+                    {Number(item.openQuestionCount)} open Q&amp;A
+                  </span>
+                )}
+              </div>
               <h3 className="mt-3 font-semibold text-slate-900 dark:text-white line-clamp-2">{item.name}</h3>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{item.description || 'No description provided.'}</p>
               <div className="mt-2 flex items-center justify-between text-sm">
                 <span className="text-indigo-600 dark:text-indigo-400 font-semibold">₹{Number(item.price || 0).toFixed(2)}</span>
                 <span className="text-slate-500 dark:text-slate-400">★ {Number(item.rating || 0).toFixed(1)}</span>
               </div>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                Q&amp;A: {Number(item.openQuestionCount || 0)} open / {Number(item.totalQuestionCount || 0)} total
+              </p>
               <p className={`mt-2 text-xs font-semibold ${item.inStock === false ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                 {item.inStock === false
                   ? 'Out of stock'

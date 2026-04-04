@@ -234,7 +234,11 @@ const ProductDetail = ({ product: initialProduct, onNavigate }) => {
               </div>
           )}
           
-          <CommunityQA questions={product.communityQA || []} />
+          <CommunityQA
+              productId={product.id}
+              sellerUserId={product.listedByUserId}
+              questions={product.communityQA || []}
+          />
 
           {/* Specs and Reviews */}
           <div className="mt-12 border-t pt-8">

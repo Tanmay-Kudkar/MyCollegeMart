@@ -129,6 +129,11 @@ public class AuthController {
             @RequestParam(name = "accountType", required = false) String accountType,
             HttpServletRequest request,
             HttpServletResponse response) throws IOException {
+        if (accountType != null && "MASTER".equalsIgnoreCase(accountType.trim())) {
+            redirectWithError(response, "master_google_disabled");
+            return;
+        }
+
         if (!isGoogleConfiguredForOAuthCodeFlow()) {
             logger.error("Google OAuth code flow is not configured on backend");
             redirectWithError(response, "google_oauth_not_configured");
@@ -203,6 +208,9 @@ public class AuthController {
             String jwt = jwtUtil.generateToken(user.getId(), user.getEmail());
 
             response.sendRedirect(frontendBaseUrl + "/#token=" + encode(jwt));
+        } catch (IllegalStateException e) {
+            logger.warn("Google OAuth rejected: {}", e.getMessage());
+            redirectWithError(response, "master_google_disabled");
         } catch (Exception e) {
             logger.error("Google OAuth callback failed. Cause: {}", e.getMessage(), e);
             redirectWithError(response, "google_sign_in_failed");

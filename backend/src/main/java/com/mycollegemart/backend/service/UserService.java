@@ -110,6 +110,10 @@ public class UserService {
             throw new IllegalArgumentException("Email is required");
         }
 
+        if (isMasterEmail(normalizedEmail)) {
+            throw new IllegalStateException("Master account is system-managed. Use the Master login portal.");
+        }
+
         String normalizedAccountType = normalizeAccountType(accountType);
 
         Optional<User> existingUserOpt = userRepository.findByEmail(normalizedEmail);
@@ -164,6 +168,10 @@ public class UserService {
 
     public User findOrCreateGoogleUser(String email, String name, String googleId, String accountType) {
         String normalizedEmail = normalizeEmail(email);
+        if (isMasterEmail(normalizedEmail)) {
+            throw new IllegalStateException("Master account supports email/password sign in only");
+        }
+
         String normalizedAccountType = normalizeAccountType(accountType);
         Optional<User> existingUserOpt = userRepository.findByEmail(normalizedEmail);
 
@@ -452,6 +460,16 @@ public class UserService {
             return null;
         }
         return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isMasterEmail(String normalizedEmail) {
+        if (normalizedEmail == null || normalizedEmail.isBlank()) {
+            return false;
+        }
+
+        return masterEmail != null
+                && !masterEmail.isBlank()
+                && masterEmail.equals(normalizedEmail);
     }
 
     private boolean hasPassword(User user) {
