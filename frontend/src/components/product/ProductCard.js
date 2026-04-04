@@ -2,19 +2,44 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import { HeartIcon, ShoppingCartIcon } from '../UI/Icons';
-import { products } from '../../utils/api';
+import { products, wishlist as wishlistApi } from '../../utils/api';
 
 const ProductCard = ({ product, onProductSelect, compact = false }) => {
     const { state, dispatch } = useGlobalState();
     const [isAdding, setIsAdding] = useState(false);
+    const [isUpdatingWishlist, setIsUpdatingWishlist] = useState(false);
     const isWishlisted = state.wishlist.includes(product.id);
 
-    const handleWishlistToggle = (e) => {
+    const handleWishlistToggle = async (e) => {
         e.stopPropagation();
-        dispatch({ 
-            type: actionTypes.TOGGLE_WISHLIST,
-            payload: product.id 
-        });
+        if (isUpdatingWishlist) return;
+
+        if (!state.isLoggedIn) {
+            dispatch({ 
+                type: actionTypes.TOGGLE_WISHLIST,
+                payload: product.id 
+            });
+            return;
+        }
+
+        setIsUpdatingWishlist(true);
+        try {
+            const response = isWishlisted
+                ? await wishlistApi.remove(product.id)
+                : await wishlistApi.add(product.id);
+
+            dispatch({
+                type: actionTypes.SET_WISHLIST,
+                payload: Array.isArray(response.data?.productIds) ? response.data.productIds : []
+            });
+        } catch (_) {
+            dispatch({
+                type: actionTypes.ADD_NOTIFICATION,
+                payload: { message: 'Failed to update wishlist.', type: 'error' }
+            });
+        } finally {
+            setIsUpdatingWishlist(false);
+        }
     };
 
     const handleAddToCart = async (e) => {
@@ -23,7 +48,16 @@ const ProductCard = ({ product, onProductSelect, compact = false }) => {
 
         setIsAdding(true);
         try {
-            await products.addToCart(product.id, 1);
+            if (!state.isLoggedIn) {
+                dispatch({ type: actionTypes.ADD_TO_CART, payload: product });
+                dispatch({
+                    type: actionTypes.ADD_NOTIFICATION,
+                    payload: { message: 'Added to cart!', type: 'success' }
+                });
+                return;
+            }
+
+            await products.addToCart(product.id, 1, state.user?.id || null);
             dispatch({ type: actionTypes.ADD_TO_CART, payload: product });
             dispatch({ 
                 type: actionTypes.ADD_NOTIFICATION, 
@@ -62,6 +96,7 @@ const ProductCard = ({ product, onProductSelect, compact = false }) => {
                 />
                 <button
                     onClick={handleWishlistToggle}
+                    disabled={isUpdatingWishlist}
                     className={`absolute top-2 left-2 rounded-full bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700 transition ${compact ? 'p-1' : 'p-1.5'}`}
                     aria-label="Toggle Wishlist"
                 >

@@ -1,10 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --mcm-font-body: 'Manrope', 'Segoe UI', sans-serif;
+  --mcm-font-display: 'Sora', 'Manrope', 'Segoe UI', sans-serif;
+}
+
 /* Base styles */
 body {
-  @apply bg-white text-slate-900 transition-colors duration-200;
+  @apply text-slate-900 transition-colors duration-200;
+  font-family: var(--mcm-font-body);
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
 }
 
 /* Dark mode overrides */
@@ -19,4 +28,10 @@ body {
 
 .dark .border-slate-200 {
   @apply border-slate-700;
+}
+
+.brand-wordmark,
+.mcm-display {
+  font-family: var(--mcm-font-display);
+  letter-spacing: -0.02em;
 }

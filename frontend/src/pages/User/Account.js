@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { useGlobalState } from '../../context/GlobalStateContext';
+import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import { 
   ClipboardListIcon, 
   LocationMarkerIcon, 
@@ -10,11 +10,19 @@ import {
 } from '../../components/UI/Icons';
 
 const Account = ({ onNavigate }) => {
-  const { state } = useGlobalState();
-  const user = { 
-    displayName: 'Tanmay Vijay Kudkar', 
-    email: 'kudkartanmay25@gmail.com',
-    initials: 'TV'
+  const { state, dispatch } = useGlobalState();
+
+  const resolvedDisplayName = state.user?.displayName || state.user?.email?.split('@')[0] || 'Student';
+  const user = {
+    displayName: resolvedDisplayName,
+    email: state.user?.email || 'Not available',
+    initials: resolvedDisplayName
+      .split(' ')
+      .filter(Boolean)
+      .map((word) => word[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'ST'
   };
   
   const isPrimeMember = state.user?.isPrimeMember;
@@ -28,14 +36,36 @@ const Account = ({ onNavigate }) => {
   ];
 
   const handleMenuClick = (item) => {
-    // For logout, we would typically clear authentication state
     if (item.action === 'logout') {
-      // In a real app, clear auth tokens, user session, etc.
-      console.log('Logging out user');
-      // Then navigate to home
+      dispatch({ type: actionTypes.LOGOUT });
+      onNavigate('Home');
+      return;
     }
     onNavigate(item.page);
   };
+
+  if (!state.isLoggedIn) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="max-w-xl mx-auto py-16 px-4"
+      >
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Sign in required</h1>
+          <p className="text-slate-600 dark:text-slate-300 mt-3">
+            Please sign in to view your account details and wallet.
+          </p>
+          <button
+            onClick={() => onNavigate('Login')}
+            className="mt-6 px-5 py-2.5 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold transition-colors"
+          >
+            Go to Sign in
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div 

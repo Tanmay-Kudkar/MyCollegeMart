@@ -1,15 +1,44 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import { CloseIcon, AddIcon, RemoveIcon, TrashIcon } from '../UI/Icons';
+import { cart as cartApi } from '../../utils/api';
 
 const ShoppingCart = ({ isOpen, onClose, onNavigate }) => {
   const { state, dispatch } = useGlobalState();
   const cartItems = Object.values(state.cart.items);
   const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+  const applyBackendCart = (payload) => {
+    const backendItems = Array.isArray(payload?.items) ? payload.items : [];
+    const mappedItems = backendItems.reduce((acc, item) => {
+      acc[item.id] = {
+        id: item.id,
+        name: item.name,
+        price: Number(item.price || 0),
+        imageUrl: item.imageUrl,
+        quantity: Number(item.quantity || 1),
+      };
+      return acc;
+    }, {});
+
+    dispatch({ type: actionTypes.SET_CART, payload: { items: mappedItems } });
+  };
+
+  useEffect(() => {
+    if (!isOpen || !state.isLoggedIn) {
+      return;
+    }
+
+    cartApi.get(state.user?.id)
+      .then((response) => applyBackendCart(response.data))
+      .catch(() => {
+        // Keep local cart if backend cart read fails.
+      });
+  }, [isOpen, state.isLoggedIn, state.user?.id]);
   
-  const handleIncreaseQuantity = (productId) => {
+  const handleIncreaseQuantity = async (productId) => {
     // Block Prime Membership quantity > 1
     if (productId === 'prime-membership') {
       dispatch({
@@ -18,26 +47,69 @@ const ShoppingCart = ({ isOpen, onClose, onNavigate }) => {
       });
       return;
     }
-    dispatch({ 
-      type: actionTypes.UPDATE_CART_ITEM_QUANTITY, 
-      payload: { id: productId, quantity: state.cart.items[productId].quantity + 1 }
-    });
-  };
-  
-  const handleDecreaseQuantity = (productId) => {
-    const currentQuantity = state.cart.items[productId].quantity;
-    if (currentQuantity === 1) {
-      handleRemoveItem(productId);
-    } else {
+    const nextQuantity = state.cart.items[productId].quantity + 1;
+
+    if (!state.isLoggedIn) {
       dispatch({ 
         type: actionTypes.UPDATE_CART_ITEM_QUANTITY, 
-        payload: { id: productId, quantity: currentQuantity - 1 }
+        payload: { id: productId, quantity: nextQuantity }
+      });
+      return;
+    }
+
+    try {
+      const response = await cartApi.updateItemQuantity(productId, nextQuantity, state.user?.id);
+      applyBackendCart(response.data);
+    } catch (_) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Failed to update cart item.', type: 'error' }
       });
     }
   };
   
-  const handleRemoveItem = (productId) => {
-    dispatch({ type: actionTypes.REMOVE_FROM_CART, payload: productId });
+  const handleDecreaseQuantity = async (productId) => {
+    const currentQuantity = state.cart.items[productId].quantity;
+    if (currentQuantity === 1) {
+      handleRemoveItem(productId);
+    } else {
+      const nextQuantity = currentQuantity - 1;
+
+      if (!state.isLoggedIn) {
+        dispatch({ 
+          type: actionTypes.UPDATE_CART_ITEM_QUANTITY, 
+          payload: { id: productId, quantity: nextQuantity }
+        });
+        return;
+      }
+
+      try {
+        const response = await cartApi.updateItemQuantity(productId, nextQuantity, state.user?.id);
+        applyBackendCart(response.data);
+      } catch (_) {
+        dispatch({
+          type: actionTypes.ADD_NOTIFICATION,
+          payload: { message: 'Failed to update cart item.', type: 'error' }
+        });
+      }
+    }
+  };
+  
+  const handleRemoveItem = async (productId) => {
+    if (!state.isLoggedIn) {
+      dispatch({ type: actionTypes.REMOVE_FROM_CART, payload: productId });
+      return;
+    }
+
+    try {
+      const response = await cartApi.removeItem(productId, state.user?.id);
+      applyBackendCart(response.data);
+    } catch (_) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Failed to remove cart item.', type: 'error' }
+      });
+    }
   };
 
   const handleCheckout = () => {

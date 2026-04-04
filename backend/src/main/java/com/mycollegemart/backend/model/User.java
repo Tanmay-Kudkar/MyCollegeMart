@@ -4,6 +4,9 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.HashSet;
+import java.util.Set;
+
 @Getter
 @Setter
 @Entity
@@ -17,7 +20,8 @@ public class User {
     @Column(unique = true, nullable = false)
     private String email;
 
-    // ✅ CHANGE: Made nullable=true so users signing up with Google don't need a password.
+    // ✅ CHANGE: Made nullable=true so users signing up with Google don't need a
+    // password.
     @Column(nullable = true)
     private String password;
 
@@ -31,4 +35,9 @@ public class User {
     // This is a more reliable identifier than email.
     @Column(name = "google_id")
     private String googleId;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_wishlist", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "product_id")
+    private Set<Long> wishlistProductIds = new HashSet<>();
 }

@@ -21,10 +21,12 @@ Common variables:
 - CORS_ALLOWED_ORIGINS
 - MYCOLLEGEMART_GOOGLE_CLIENT_ID
 - MYCOLLEGEMART_GOOGLE_CLIENT_SECRET
-- MYCOLLEGEMART_GOOGLE_REDIRECT_URI
+- MYCOLLEGEMART_GOOGLE_REDIRECT_URI (optional; if omitted, backend auto-derives from request host)
 - FRONTEND_BASE_URL
 - JWT_SECRET (minimum 32 characters)
 - JWT_EXPIRATION
+- RAZORPAY_KEY_ID (required for online checkout)
+- RAZORPAY_KEY_SECRET (required for online checkout)
 
 ## Run
 Windows PowerShell:
@@ -33,6 +35,16 @@ Windows PowerShell:
 
 ## Notes
 - Runtime database driver is PostgreSQL (org.postgresql:postgresql).
+- Checkout is backend-driven via:
+	- POST /api/checkout/create-order
+	- POST /api/checkout/verify-payment
+	- POST /api/checkout/place-cod
+	- GET /api/orders/my
+- Wishlist is persisted per authenticated user via:
+	- GET /api/wishlist
+	- POST /api/wishlist/{productId}
+	- DELETE /api/wishlist/{productId}
+	- POST /api/wishlist/sync
 - Recommended production values:
 	- JPA_DDL_AUTO=validate
 	- JPA_SHOW_SQL=false

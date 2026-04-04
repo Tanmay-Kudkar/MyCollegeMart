@@ -7,6 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -21,7 +23,12 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.mycollegemart.backend.model.User;
 import com.mycollegemart.backend.service.UserService;
 import com.mycollegemart.backend.util.JwtUtil;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -47,9 +54,9 @@ public class AuthController {
     public AuthController(
             UserService userService,
             JwtUtil jwtUtil,
-            @Value("${google.clientId}") String googleClientId,
+            @Value("${google.clientId:}") String googleClientId,
             @Value("${google.clientSecret:}") String googleClientSecret,
-            @Value("${google.redirectUri:http://localhost:8080/api/auth/google/callback}") String googleRedirectUri,
+            @Value("${google.redirectUri:}") String googleRedirectUri,
             @Value("${app.frontend.base-url:http://localhost:3000}") String frontendBaseUrl) {
         this.userService = userService;
         this.jwtUtil = jwtUtil;
@@ -59,17 +66,57 @@ public class AuthController {
         this.frontendBaseUrl = stripTrailingSlash(frontendBaseUrl);
     }
 
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@Valid @RequestBody AuthRequest request) {
+        try {
+            User user = userService.registerWithPassword(request.email(), request.password());
+            Map<String, Object> response = new HashMap<>();
+            response.put("id", user.getId());
+            response.put("email", user.getEmail());
+            response.put("displayName", user.getDisplayName());
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Registration failed. Cause: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Failed to register user"));
+        }
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@Valid @RequestBody AuthRequest request) {
+        try {
+            User user = userService.authenticateWithPassword(request.email(), request.password());
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("message", "Invalid email or password"));
+            }
+
+            String token = jwtUtil.generateToken(user.getId(), user.getEmail());
+            return ResponseEntity.ok(Map.of("token", token));
+        } catch (Exception e) {
+            logger.error("Login failed. Cause: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Failed to sign in"));
+        }
+    }
+
     @GetMapping("/google/start")
-    public void startGoogleOAuth(HttpServletResponse response) throws IOException {
+    public void startGoogleOAuth(HttpServletRequest request, HttpServletResponse response) throws IOException {
         if (!isGoogleConfiguredForOAuthCodeFlow()) {
             logger.error("Google OAuth code flow is not configured on backend");
             redirectWithError(response, "google_oauth_not_configured");
             return;
         }
 
+        String redirectUri = resolveGoogleRedirectUri(request);
+
         String authUrl = "https://accounts.google.com/o/oauth2/v2/auth"
                 + "?client_id=" + encode(googleClientId)
-                + "&redirect_uri=" + encode(googleRedirectUri)
+                + "&redirect_uri=" + encode(redirectUri)
                 + "&response_type=code"
                 + "&scope=" + encode("openid email profile")
                 + "&prompt=select_account";
@@ -81,6 +128,7 @@ public class AuthController {
     public void handleGoogleOAuthCallback(
             @RequestParam(name = "code", required = false) String code,
             @RequestParam(name = "error", required = false) String error,
+            HttpServletRequest request,
             HttpServletResponse response) throws IOException {
         if (error != null && !error.isBlank()) {
             redirectWithError(response, "google_access_denied");
@@ -97,6 +145,8 @@ public class AuthController {
             return;
         }
 
+        String redirectUri = resolveGoogleRedirectUri(request);
+
         try {
             GoogleTokenResponse tokenResponse = new GoogleAuthorizationCodeTokenRequest(
                     GoogleNetHttpTransport.newTrustedTransport(),
@@ -104,7 +154,7 @@ public class AuthController {
                     googleClientId,
                     googleClientSecret,
                     code,
-                    googleRedirectUri).execute();
+                    redirectUri).execute();
 
             String idTokenValue = tokenResponse.getIdToken();
             if (idTokenValue == null || idTokenValue.isBlank()) {
@@ -159,6 +209,7 @@ public class AuthController {
             response.put("displayName", user.getDisplayName());
             response.put("isPrimeMember", user.isPrimeMember());
             response.put("primeExpiryDate", user.getPrimeExpiryDate());
+            response.put("wishlistProductIds", user.getWishlistProductIds());
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -181,9 +232,19 @@ public class AuthController {
         return googleClientId != null
                 && !googleClientId.isBlank()
                 && googleClientSecret != null
-                && !googleClientSecret.isBlank()
-                && googleRedirectUri != null
-                && !googleRedirectUri.isBlank();
+                && !googleClientSecret.isBlank();
+    }
+
+    private String resolveGoogleRedirectUri(HttpServletRequest request) {
+        if (googleRedirectUri != null && !googleRedirectUri.isBlank()) {
+            return googleRedirectUri.trim();
+        }
+
+        return ServletUriComponentsBuilder.fromRequestUri(request)
+                .replacePath("/api/auth/google/callback")
+                .replaceQuery(null)
+                .build()
+                .toUriString();
     }
 
     private String encode(String value) {
@@ -205,5 +266,10 @@ public class AuthController {
 
     private void redirectWithError(HttpServletResponse response, String errorCode) throws IOException {
         response.sendRedirect(frontendBaseUrl + "/#authError=" + encode(errorCode));
+    }
+
+    private record AuthRequest(
+            @NotBlank(message = "Email is required") @Email(message = "Please enter a valid email") String email,
+            @NotBlank(message = "Password is required") String password) {
     }
 }

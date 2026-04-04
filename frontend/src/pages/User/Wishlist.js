@@ -1,12 +1,28 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useGlobalState } from '../../context/GlobalStateContext';
+import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import ProductCard from '../../components/product/ProductCard';
 
 const PAGE_SIZE = 12;
 
 const Wishlist = ({ onNavigate }) => {
-  const { state } = useGlobalState();
+  const { state, dispatch } = useGlobalState();
+
+  useEffect(() => {
+    if (state.products.status !== 'idle') {
+      return;
+    }
+
+    dispatch({ type: actionTypes.FETCH_PRODUCTS_START });
+    state.products.api.getAll()
+      .then((response) => {
+        dispatch({ type: actionTypes.FETCH_PRODUCTS_SUCCESS, payload: response.data });
+      })
+      .catch(() => {
+        dispatch({ type: actionTypes.FETCH_PRODUCTS_FAIL, payload: 'Failed to load products' });
+      });
+  }, [state.products.status, state.products.api, dispatch]);
+
   const wishlistedProducts = useMemo(
     () => state.products.items.filter(p => state.wishlist.includes(p.id)),
     [state.products.items, state.wishlist]

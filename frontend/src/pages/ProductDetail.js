@@ -12,6 +12,7 @@ const ProductDetail = ({ product: initialProduct, onNavigate }) => {
   const { state, dispatch } = useGlobalState();
   const [product, setProduct] = useState(initialProduct || null);
   const [mainImage, setMainImage] = useState('');
+    const [mediaItems, setMediaItems] = useState([]);
   const [isAdding, setIsAdding] = useState(false); // Add loading state
   const [loading, setLoading] = useState(!initialProduct);
   const [error, setError] = useState(null);
@@ -30,13 +31,45 @@ const ProductDetail = ({ product: initialProduct, onNavigate }) => {
   }, [productId, product]);
 
   useEffect(() => {
-    if (product) {
-      setMainImage(product.imageUrl);
+        if (!product?.id) {
+            setMediaItems([]);
+            return;
     }
-  }, [product]);
+
+        products.getMedia(product.id)
+            .then((response) => {
+                setMediaItems(Array.isArray(response.data) ? response.data : []);
+            })
+            .catch(() => {
+                setMediaItems([]);
+            });
+    }, [product?.id]);
+
+    useEffect(() => {
+        if (!product) {
+            return;
+        }
+        const firstUploadedImage = mediaItems.find((item) => item.mediaType === 'IMAGE')?.url || '';
+        setMainImage(product.imageUrl || firstUploadedImage);
+    }, [product, mediaItems]);
 
   if (loading) return <div>Loading...</div>;
   if (error || !product) return <div>Product not found</div>;
+
+    const mediaImages = mediaItems
+        .filter((item) => item.mediaType === 'IMAGE' && item.url)
+        .map((item) => item.url);
+
+    const mediaVideos = mediaItems
+        .filter((item) => item.mediaType === 'VIDEO' && item.url)
+        .map((item) => item.url);
+
+    const galleryImages = [
+        ...(Array.isArray(product.gallery) ? product.gallery : []),
+        ...mediaImages,
+    ].filter(Boolean);
+
+    const uniqueGalleryImages = [...new Set(galleryImages)];
 
   const handleAddToCart = async () => {
       // Enforce Prime Membership limit = 1
@@ -50,14 +83,16 @@ const ProductDetail = ({ product: initialProduct, onNavigate }) => {
       if (isAdding) return;
       setIsAdding(true);
       try {
-          const result = await products.addToCart(state.user.id, product);
-          if (result.success) {
+          if (!state.isLoggedIn) {
               dispatch({ type: actionTypes.ADD_TO_CART, payload: product });
               dispatch({ type: actionTypes.ADD_NOTIFICATION, payload: { message: `${product.name} added to cart!`, type: 'success' } });
-          } else {
-              dispatch({ type: actionTypes.ADD_NOTIFICATION, payload: { message: 'Failed to add to cart.', type: 'error' } });
+              return;
           }
-      } catch (error) {
+
+          await products.addToCart(product.id, 1, state.user?.id || null);
+          dispatch({ type: actionTypes.ADD_TO_CART, payload: product });
+          dispatch({ type: actionTypes.ADD_NOTIFICATION, payload: { message: `${product.name} added to cart!`, type: 'success' } });
+      } catch (_) {
           dispatch({ type: actionTypes.ADD_NOTIFICATION, payload: { message: 'An error occurred.', type: 'error' } });
       } finally {
           setIsAdding(false);
@@ -75,15 +110,35 @@ const ProductDetail = ({ product: initialProduct, onNavigate }) => {
               {/* Left Column: Image Gallery */}
               <div className="lg:col-span-1">
                   <div className="aspect-w-3 aspect-h-4 rounded-lg overflow-hidden shadow-lg">
-                      <img src={mainImage} alt={product.name} className="w-full h-full object-cover"/>
+                      {mainImage ? (
+                          <img src={mainImage} alt={product.name} className="w-full h-full object-cover"/>
+                      ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                              No image available
+                          </div>
+                      )}
                   </div>
                   <div className="mt-4 grid grid-cols-4 gap-2">
-                      {product.gallery?.map((img, idx) => (
+                      {uniqueGalleryImages.map((img, idx) => (
                            <button key={idx} onClick={() => setMainImage(img)} className={`rounded-lg overflow-hidden border-2 ${mainImage === img ? 'border-indigo-500' : 'border-transparent'}`}>
                               <img src={img} alt={`thumbnail ${idx+1}`} className="w-full h-full object-cover" />
                           </button>
                       ))}
                   </div>
+
+                  {mediaVideos.length > 0 && (
+                      <div className="mt-5 space-y-2">
+                          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Uploaded Videos</h3>
+                          {mediaVideos.map((videoUrl, index) => (
+                              <video
+                                  key={`video-${index}`}
+                                  src={videoUrl}
+                                  controls
+                                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700"
+                              />
+                          ))}
+                      </div>
+                  )}
               </div>
               
               {/* Center Column: Product Info */}

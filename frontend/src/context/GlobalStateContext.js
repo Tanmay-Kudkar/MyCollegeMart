@@ -56,6 +56,8 @@ const buildNotification = (payload) => ({
 export const actionTypes = {
   SET_USER: 'SET_USER',
   LOGOUT: 'LOGOUT',
+  SET_CART: 'SET_CART',
+  SET_WISHLIST: 'SET_WISHLIST',
   ADD_TO_CART: 'ADD_TO_CART',
   REMOVE_FROM_CART: 'REMOVE_FROM_CART',
   UPDATE_CART_ITEM_QUANTITY: 'UPDATE_CART_ITEM_QUANTITY',
@@ -104,7 +106,33 @@ const globalStateReducer = (state, action) => {
         ...state,
         user: buildGuestUser(),
         isLoggedIn: false,
+        cart: { items: {} },
+        wishlist: [],
       };
+
+    case actionTypes.SET_CART: {
+      const incomingItems = action.payload?.items && typeof action.payload.items === 'object'
+        ? action.payload.items
+        : {};
+      const preservedLocalItems = Object.entries(state.cart.items || {}).reduce((acc, [id, item]) => {
+        if (Number.isNaN(Number(id))) {
+          acc[id] = item;
+        }
+        return acc;
+      }, {});
+
+      return {
+        ...state,
+        cart: {
+          ...state.cart,
+          ...(action.payload || { items: {} }),
+          items: {
+            ...preservedLocalItems,
+            ...incomingItems,
+          },
+        },
+      };
+    }
 
     case actionTypes.ADD_TO_CART: {
       const product = action.payload;
@@ -238,6 +266,12 @@ const globalStateReducer = (state, action) => {
           : [...state.wishlist, productId],
       };
     }
+
+    case actionTypes.SET_WISHLIST:
+      return {
+        ...state,
+        wishlist: Array.isArray(action.payload) ? action.payload : [],
+      };
 
     case actionTypes.ADD_NOTIFICATION: {
       const notification = buildNotification(action.payload);

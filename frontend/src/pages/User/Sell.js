@@ -2,10 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import { TrashIcon, SparklesIcon, UploadIcon, CloseIcon } from '../../components/UI/Icons';
+import { products } from '../../utils/api';
 
 const Sell = ({ onNavigate }) => {
-  const { dispatch } = useGlobalState();
+  const { state, dispatch } = useGlobalState();
   const [itemName, setItemName] = useState('');
+  const [price, setPrice] = useState('');
   const [category, setCategory] = useState('Textbooks');
   const [branch, setBranch] = useState('All Branches');
   const [semester, setSemester] = useState('All');
@@ -16,6 +18,7 @@ const Sell = ({ onNavigate }) => {
   const [highlights, setHighlights] = useState(['', '', '']);
   // const [specs, setSpecs] = useState([{ key: '', value: '' }]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [videoError, setVideoError] = useState(''); // Track video upload errors
   const videoInputRef = useRef(null); // Reference to video input element
 
@@ -52,14 +55,21 @@ const Sell = ({ onNavigate }) => {
 
   const handleImageChange = (e) => {
     if (e.target.files) {
-      const filesArray = Array.from(e.target.files).map(file => URL.createObjectURL(file));
+      const filesArray = Array.from(e.target.files).map(file => ({
+        file,
+        url: URL.createObjectURL(file)
+      }));
       setImagePreviews(prev => prev.concat(filesArray));
-      // In a real app, you'd handle the file objects themselves for upload
     }
   };
   
   const removeImage = (index) => {
-    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => {
+      const nextImages = [...prev];
+      URL.revokeObjectURL(nextImages[index].url);
+      nextImages.splice(index, 1);
+      return nextImages;
+    });
   };
 
   // New function to handle video uploads
@@ -203,13 +213,102 @@ const Sell = ({ onNavigate }) => {
     }, 1500);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    dispatch({
-      type: actionTypes.ADD_NOTIFICATION,
-      payload: { message: `Item listed for sale successfully!`, type: 'success' }
-    });
-    onNavigate('Marketplace');
+
+    if (!price || Number(price) <= 0) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Please enter a valid price.', type: 'error' }
+      });
+      return;
+    }
+
+    if (imagePreviews.length === 0) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Please upload at least one image.', type: 'error' }
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const highlightsList = highlights
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(0, 3);
+
+      const specsMap = specs.reduce((acc, spec) => {
+        const key = spec.key?.trim();
+        const value = spec.value?.trim();
+        if (key && value) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {});
+
+      const formData = new FormData();
+      formData.append('name', itemName.trim());
+      formData.append('description', description.trim());
+      formData.append('price', String(Number(price)));
+      formData.append('category', category);
+      formData.append('branch', branch);
+      formData.append('semester', semester);
+      formData.append('highlightsJson', JSON.stringify(highlightsList));
+      formData.append('specsJson', JSON.stringify(specsMap));
+
+      if (videoUrl.trim()) {
+        formData.append('externalVideoUrl', videoUrl.trim());
+      }
+
+      imagePreviews.forEach((image) => {
+        formData.append('images', image.file);
+      });
+
+      videoPreviews.forEach((video) => {
+        formData.append('videos', video.file);
+      });
+
+      const response = await products.createListing(formData);
+      const createdProduct = response.data;
+
+      const currentItems = Array.isArray(state.products?.items) ? state.products.items : [];
+      dispatch({
+        type: actionTypes.FETCH_PRODUCTS_SUCCESS,
+        payload: [createdProduct, ...currentItems.filter((item) => item.id !== createdProduct?.id)],
+      });
+
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Item listed for sale successfully!', type: 'success' }
+      });
+
+      imagePreviews.forEach((image) => URL.revokeObjectURL(image.url));
+      videoPreviews.forEach((video) => URL.revokeObjectURL(video.url));
+
+      setItemName('');
+      setPrice('');
+      setCategory('Textbooks');
+      setBranch('All Branches');
+      setSemester('All');
+      setDescription('');
+      setImagePreviews([]);
+      setVideoPreviews([]);
+      setVideoUrl('');
+      setHighlights(['', '', '']);
+      setSpecs([]);
+      setAvailableOptions([...allSpecOptions]);
+
+      onNavigate('Marketplace');
+    } catch (error) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: error?.message || 'Failed to create listing.', type: 'error' }
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const INPUT_STYLE = "w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition";
@@ -235,7 +334,15 @@ const Sell = ({ onNavigate }) => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Price (₹)*</label>
-                <input type="number" required className={`mt-1 ${INPUT_STYLE}`}/>
+                <input
+                  type="number"
+                  value={price}
+                  onChange={e => setPrice(e.target.value)}
+                  min="1"
+                  step="0.01"
+                  required
+                  className={`mt-1 ${INPUT_STYLE}`}
+                />
               </div>
               <div>
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Category*</label>
@@ -318,7 +425,7 @@ const Sell = ({ onNavigate }) => {
               <div className="mt-2 flex items-center flex-wrap gap-4">
                 {imagePreviews.map((src, index) => (
                   <div key={index} className="relative w-24 h-24">
-                    <img src={src} alt="Preview" className="w-full h-full object-cover rounded-lg"/>
+                    <img src={src.url} alt="Preview" className="w-full h-full object-cover rounded-lg"/>
                     <button 
                       type="button" 
                       onClick={() => removeImage(index)} 
@@ -465,8 +572,12 @@ const Sell = ({ onNavigate }) => {
             </div>
           </fieldset>
           
-          <button type="submit" className="w-full py-3 px-4 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold rounded-lg transition shadow-md">
-            List My Item
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full py-3 px-4 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold rounded-lg transition shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? 'Listing Item...' : 'List My Item'}
           </button>
         </form>
       </motion.div>

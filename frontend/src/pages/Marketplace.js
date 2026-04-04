@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useGlobalState, actionTypes } from '../context/GlobalStateContext';
 import ProductCard from '../components/product/ProductCard';
-import { AcademicCapIcon } from '../components/UI/Icons'; // added
+import { AcademicCapIcon } from '../components/UI/Icons';
 
 const FALLBACK_PRODUCTS = [
     {
@@ -50,8 +50,20 @@ const FALLBACK_PRODUCTS = [
     },
 ];
 
-const Filters = ({ categories, selectedCategory, onSelectCategory, onSortChange, onBranchChange, onSemesterChange, isPrimeMember }) => {
-    // Updated engineering branches
+const FILTER_SELECT_STYLE = 'w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200';
+
+const Filters = ({
+    categories,
+    selectedCategory,
+    selectedBranch,
+    selectedSemester,
+    sortMethod,
+    onSelectCategory,
+    onSortChange,
+    onBranchChange,
+    onSemesterChange,
+    isPrimeMember
+}) => {
     const branches = [
         'All Branches',
         'Computer Engineering',
@@ -68,14 +80,17 @@ const Filters = ({ categories, selectedCategory, onSelectCategory, onSortChange,
     const semesters = [1, 2, 3, 4, 5, 6, 7, 8, 'All'];
 
     return (
-        <aside className="w-full md:w-64 lg:w-72 p-4 space-y-6 bg-white dark:bg-slate-800 rounded-lg shadow md:sticky top-20 h-fit">
-            <h3 className="text-xl font-bold text-slate-800 dark:text-white">Filters</h3>
-            
+        <aside className="w-full rounded-[24px] border border-slate-200/80 bg-white/95 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800/95 xl:sticky xl:top-24 xl:h-fit">
+            <h3 className="mcm-display text-2xl font-bold text-slate-900 dark:text-white">Filters</h3>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Narrow products by relevance, branch and semester.</p>
+
+            <div className="mt-5 space-y-4">
             <div>
-                <h4 className="font-semibold mb-2 text-slate-700 dark:text-slate-300">Sort By</h4>
+                <h4 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Sort By</h4>
                 <select 
-                    onChange={(e) => onSortChange(e.target.value)} 
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-200"
+                    value={sortMethod}
+                    onChange={(e) => onSortChange(e.target.value)}
+                    className={FILTER_SELECT_STYLE}
                 >
                     <option value="relevance">Relevance</option>
                     <option value="price_asc">Price: Low to High</option>
@@ -86,20 +101,22 @@ const Filters = ({ categories, selectedCategory, onSelectCategory, onSortChange,
             </div>
 
             <div>
-                <h4 className="font-semibold mb-2 text-slate-700 dark:text-slate-300">Branch</h4>
+                <h4 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Branch</h4>
                 <select 
+                    value={selectedBranch}
                     onChange={(e) => onBranchChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-200"
+                    className={FILTER_SELECT_STYLE}
                 >
                     {branches.map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
             </div>
 
             <div>
-                <h4 className="font-semibold mb-2 text-slate-700 dark:text-slate-300">Semester</h4>
+                <h4 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Semester</h4>
                 <select 
+                    value={selectedSemester}
                     onChange={(e) => onSemesterChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-200"
+                    className={FILTER_SELECT_STYLE}
                 >
                     <option value="All">All Semesters</option>
                     {semesters.map(s => <option key={s} value={s}>{s}</option>)}
@@ -107,11 +124,11 @@ const Filters = ({ categories, selectedCategory, onSelectCategory, onSortChange,
             </div>
 
             <div>
-                <h4 className="font-semibold mb-2 text-slate-700 dark:text-slate-300">Category</h4>
+                <h4 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Category</h4>
                 <select
                     value={selectedCategory}
                     onChange={(e) => onSelectCategory(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-200"
+                    className={FILTER_SELECT_STYLE}
                 >
                     <option value="All">All</option>
                     {categories.map((category) => (
@@ -122,10 +139,11 @@ const Filters = ({ categories, selectedCategory, onSelectCategory, onSortChange,
                 </select>
                 {/* Optional helper note when Prime Exclusive selected but user isn't Prime */}
                 {selectedCategory === 'Prime Exclusive' && !isPrimeMember && (
-                    <p className="mt-2 text-xs text-amber-500 dark:text-amber-300">
+                    <p className="mt-2 text-xs text-amber-600 dark:text-amber-300">
                         Join Prime to access this category.
                     </p>
                 )}
+            </div>
             </div>
         </aside>
     );
@@ -133,11 +151,10 @@ const Filters = ({ categories, selectedCategory, onSelectCategory, onSortChange,
 
 const NoResultsFound = ({ onExploreAll }) => {
     return (
-        <div className="text-center py-20 flex flex-col items-center">
-            <div className="text-7xl mb-4">🤷‍♀️</div>
-            <h2 className="text-3xl font-bold text-slate-800 dark:text-white">No Results Found</h2>
-            <p className="mt-2 text-slate-600 dark:text-slate-400">We couldn't find any items matching your search. Don't worry, new items are added daily!</p>
-            <button onClick={onExploreAll} className="mt-6 px-6 py-2 bg-amber-400 text-slate-900 font-semibold rounded-full shadow-lg hover:bg-amber-500">
+        <div className="rounded-2xl border border-slate-200 bg-white py-16 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            <h2 className="mcm-display text-3xl font-bold text-slate-800 dark:text-white">No Results Found</h2>
+            <p className="mx-auto mt-2 max-w-md text-slate-600 dark:text-slate-400">No listings match these filters right now. Try changing your branch, category or search text.</p>
+            <button onClick={onExploreAll} className="mt-6 rounded-full bg-amber-400 px-6 py-2 font-semibold text-slate-900 shadow hover:bg-amber-500">
                 Explore All Items
             </button>
         </div>
@@ -147,7 +164,6 @@ const NoResultsFound = ({ onExploreAll }) => {
 const Marketplace = ({ onNavigate, initialCategory, initialSearch }) => {
     const { state, dispatch } = useGlobalState();
     const { items: products, status } = state.products;
-    // Removed unused filteredProducts state
     const [selectedCategory, setSelectedCategory] = useState(initialCategory || 'All');
     const [searchTerm, setSearchTerm] = useState(initialSearch || '');
     const [sortMethod, setSortMethod] = useState('relevance');
@@ -179,8 +195,6 @@ const Marketplace = ({ onNavigate, initialCategory, initialSearch }) => {
                 });
         }
     }, [status, dispatch, state.products.api]);
-    // Removed unused useEffect for filteredProducts
-    // Extended categories list with Prime Exclusive added
     const categories = useMemo(() => [
         'Textbooks',
         'Notes',
@@ -195,39 +209,37 @@ const Marketplace = ({ onNavigate, initialCategory, initialSearch }) => {
         'Technical Devices',
         'Reference Books',
         'Stationery',
-        'Prime Exclusive' // New category exclusive to Prime members
+        'Prime Exclusive'
     ], []);
+
     const handleProductSelect = (product) => {
         onNavigate('ProductDetail', product);
-    }
-    // Banner to prompt users to join Prime if they try to access Prime Exclusive
+    };
+
     const showPrimeBanner = selectedCategory === 'Prime Exclusive' && !isPrimeMember;
-    // Build the product list (apply your existing filters/search before slicing)
+
     const allItems = useMemo(() => {
         let result = [...products];
-        // Filter by Prime access if needed
+
         if (selectedCategory === 'Prime Exclusive') {
             if (isPrimeMember) {
                 result = result.filter(p => p.isPrimeExclusive);
             } else {
-                result = []; // No products shown if not Prime member
+                result = [];
             }
-        } 
-        // Otherwise, filter normally but exclude Prime exclusive items for non-Prime users
-        else {
+        } else {
             if (selectedCategory !== 'All') {
                 result = result.filter(p => p.category === selectedCategory);
             }
-            // Non-Prime users can't see Prime exclusive items in other categories
             if (!isPrimeMember) {
                 result = result.filter(p => !p.isPrimeExclusive);
             }
         }
-        // Apply other filters
+
         if (searchTerm) result = result.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
         if (selectedBranch !== 'All Branches') result = result.filter(p => p.branch === selectedBranch || p.branch === 'Any');
         if (selectedSemester !== 'All') result = result.filter(p => p.semester === selectedSemester || p.semester === 'Any');
-        // Apply sorting
+
         switch (sortMethod) {
             case 'price_asc':
                 result = result.sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
@@ -236,15 +248,15 @@ const Marketplace = ({ onNavigate, initialCategory, initialSearch }) => {
                 result = result.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
                 break;
             case 'rating':
-                result = result.sort((a, b) => (b.avgRating ?? 0) - (a.avgRating ?? 0));
+                result = result.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
                 break;
             case 'newest':
                 result = result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
                 break;
-            // 'relevance' or default: no additional sorting
             default:
                 break;
         }
+
         return result;
     }, [products, selectedCategory, searchTerm, selectedBranch, selectedSemester, isPrimeMember, sortMethod]);
 
@@ -255,12 +267,10 @@ const Marketplace = ({ onNavigate, initialCategory, initialSearch }) => {
 
     const goToPage = (p) => setPage(Math.min(Math.max(1, p), totalPages));
 
-    // Reset to page 1 on filter/search/sort changes
     useEffect(() => {
         setPage(1);
     }, [selectedCategory, searchTerm, selectedBranch, selectedSemester, sortMethod]);
 
-    // Handler to reset all filters/search for "Explore All Items"
     const handleExploreAll = () => {
         setSelectedCategory('All');
         setSearchTerm('');
@@ -270,128 +280,150 @@ const Marketplace = ({ onNavigate, initialCategory, initialSearch }) => {
         setPage(1);
     };
 
+    const displayTitle = searchTerm
+        ? `Results for "${searchTerm}"`
+        : selectedCategory !== 'All'
+            ? selectedCategory
+            : 'All Products';
+
     return (
-        <div className="flex flex-col md:flex-row gap-8">
-            <Filters 
-                categories={categories}
-                selectedCategory={selectedCategory}
-                onSelectCategory={setSelectedCategory}
-                onSortChange={setSortMethod}
-                onBranchChange={setSelectedBranch}
-                onSemesterChange={setSelectedSemester}
-                isPrimeMember={isPrimeMember}
-            />
-            <main className="flex-1">
-                <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-                        {searchTerm ? `Results for "${searchTerm}"` : selectedCategory !== 'All' ? selectedCategory : 'All Products'}
-                        {selectedCategory === 'Prime Exclusive' && isPrimeMember && (
-                            <span className="ml-3 text-sm bg-amber-500 text-slate-900 px-2 py-1 rounded-full">✨ PRIME EXCLUSIVE</span>
-                        )}
-                    </h1>
-                    <div className="flex items-center gap-3">
-                        <span className="text-sm text-slate-600 dark:text-slate-300">
-                            {allItems.length === 0 ? '0' : `${start + 1}-${Math.min(start + pageSize, allItems.length)}`} of {allItems.length}
-                        </span>
-                        <select
-                            value={pageSize}
-                            onChange={(e) => setPageSize(Number(e.target.value))}
-                            className="px-2 py-1 text-sm border border-slate-300 dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-200"
-                            title="Items per page"
-                        >
-                            <option value={12}>12 / page</option>
-                            <option value={24}>24 / page</option>
-                            <option value={36}>36 / page</option>
-                        </select>
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                            placeholder="Search products..."
-                            className="w-40 sm:w-64 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-amber-500"
-                        />
-                    </div>
-                </div>
-                {/* Prime membership banner */}
-                {showPrimeBanner && (
-                    <div className="mb-8 bg-gradient-to-r from-indigo-900 to-indigo-700 text-white p-6 rounded-lg shadow-lg">
-                        <div className="flex flex-col md:flex-row items-center justify-between">
-                            <div className="mb-4 md:mb-0">
-                                <h2 className="text-xl font-bold flex items-center">
-                                    <span className="mr-2">✨</span> Flash Deal!
-                                </h2>
-                                <p className="mt-1 text-white/95">
-                                    Get the Organic Chemistry Model Kit for just ₹1800!
-                                </p>
+        <div className="relative space-y-6">
+            <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
+                <div className="absolute -left-20 top-8 h-64 w-64 rounded-full bg-cyan-200/45 blur-3xl dark:bg-cyan-800/20" />
+                <div className="absolute right-0 top-[24rem] h-72 w-72 rounded-full bg-indigo-200/45 blur-3xl dark:bg-indigo-800/20" />
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-[290px_minmax(0,1fr)]">
+                <Filters
+                    categories={categories}
+                    selectedCategory={selectedCategory}
+                    selectedBranch={selectedBranch}
+                    selectedSemester={selectedSemester}
+                    sortMethod={sortMethod}
+                    onSelectCategory={setSelectedCategory}
+                    onSortChange={setSortMethod}
+                    onBranchChange={setSelectedBranch}
+                    onSemesterChange={setSelectedSemester}
+                    isPrimeMember={isPrimeMember}
+                />
+
+                <main className="space-y-5">
+                    <section className="rounded-[24px] border border-slate-200/80 bg-white/95 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800/95 sm:p-6">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-400">Marketplace Utility Bar</p>
+                                <h1 className="mcm-display mt-1 text-3xl font-bold text-slate-900 dark:text-white">{displayTitle}</h1>
+                                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Discover verified campus listings with fast filters and clear sorting.</p>
                             </div>
-                            <div className="flex items-center gap-2">
-                                {/* Timer boxes */}
-                                <div className="flex gap-2">
-                                    <div className="bg-indigo-800 rounded px-3 py-2 text-center">
-                                        <div className="text-lg font-bold text-white">24</div>
-                                        <div className="text-xs text-indigo-200 font-semibold">HRS</div>
-                                    </div>
-                                    <div className="bg-indigo-800 rounded px-3 py-2 text-center">
-                                        <div className="text-lg font-bold text-white">00</div>
-                                        <div className="text-xs text-indigo-200 font-semibold">MIN</div>
-                                    </div>
-                                    <div className="bg-indigo-800 rounded px-3 py-2 text-center">
-                                        <div className="text-lg font-bold text-white">00</div>
-                                        <div className="text-xs text-indigo-200 font-semibold">SEC</div>
-                                    </div>
+
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                                    {allItems.length === 0 ? '0' : `${start + 1}-${Math.min(start + pageSize, allItems.length)}`} of {allItems.length}
                                 </div>
-                                <button
-                                    onClick={() => onNavigate('ProductDetail', { id: 'flash-deal-product' })}
-                                    className="ml-4 px-5 py-2 bg-white text-indigo-900 font-bold rounded hover:bg-indigo-100 transition"
+
+                                <select
+                                    value={pageSize}
+                                    onChange={(e) => setPageSize(Number(e.target.value))}
+                                    className={FILTER_SELECT_STYLE}
+                                    title="Items per page"
                                 >
-                                    Shop Now
+                                    <option value={12}>12 / page</option>
+                                    <option value={24}>24 / page</option>
+                                    <option value={36}>36 / page</option>
+                                </select>
+
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                    placeholder="Search products..."
+                                    className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 sm:w-72"
+                                />
+                            </div>
+                        </div>
+
+                        {selectedCategory === 'Prime Exclusive' && isPrimeMember && (
+                            <div className="mt-4 inline-flex items-center rounded-full bg-amber-200 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-900">
+                                Prime Exclusive Access Enabled
+                            </div>
+                        )}
+                    </section>
+
+                {showPrimeBanner && (
+                    <section className="rounded-[24px] border border-indigo-300/50 bg-gradient-to-br from-indigo-950 via-indigo-800 to-cyan-700 p-6 text-white shadow-lg">
+                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-100">Prime Section Locked</p>
+                                <h2 className="mcm-display mt-1 text-2xl font-bold">Upgrade to Prime for Exclusive Listings</h2>
+                                <p className="mt-1 text-sm text-white/85">Prime members get access to limited academic bundles, premium seller inventory and faster pickup slots.</p>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => onNavigate('PrimeMembership')}
+                                    className="rounded-lg bg-amber-400 px-5 py-2.5 font-semibold text-slate-900 transition hover:bg-amber-500"
+                                >
+                                    Upgrade Prime
+                                </button>
+                                <button
+                                    onClick={() => setSelectedCategory('All')}
+                                    className="rounded-lg border border-white/35 px-5 py-2.5 font-semibold text-white transition hover:bg-white/15"
+                                >
+                                    View Public Listings
                                 </button>
                             </div>
                         </div>
-                    </div>
+                    </section>
                 )}
-                {status === 'loading' && <p>Loading...</p>}
-                {status === 'succeeded' && (
-                    pagedItems.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
-                            {pagedItems.map((product) => (
-                                <div key={product.id}>
-                                  <ProductCard
-                                    product={product}
-                                    onProductSelect={handleProductSelect}
-                                    compact
-                                  />
-                                  {/* Card footer extension to accommodate sem tag */}
-                                  <div className="-mt-1 bg-white dark:bg-slate-800 rounded-b-lg px-3 py-1.5 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 text-[11px]">
-                                      <AcademicCapIcon className="w-3.5 h-3.5" />
-                                      {(() => {
-                                        const sem = product.semester;
-                                        if (sem === 'All' || sem === 'Any') return 'All Semesters';
-                                        const n = Number(sem);
-                                        return Number.isNaN(n) ? `${sem}` : `Sem ${n}`;
-                                      })()}
-                                    </span>
-                                    <span className="text-[11px] text-slate-400 dark:text-slate-500"></span>
-                                  </div>
+
+                    {status === 'loading' && (
+                        <section className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                            Loading marketplace listings...
+                        </section>
+                    )}
+
+                    {status === 'failed' && (
+                        <section className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-700 shadow-sm dark:border-rose-800/40 dark:bg-rose-900/10 dark:text-rose-300">
+                            Error loading products. Please refresh and try again.
+                        </section>
+                    )}
+
+                    {status === 'succeeded' && (
+                        pagedItems.length > 0 ? (
+                            <section className="rounded-[24px] border border-slate-200/80 bg-white/95 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800/95 sm:p-6">
+                                <h2 className="mcm-display mb-4 text-2xl font-bold text-slate-900 dark:text-white">Product Grid</h2>
+                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+                                    {pagedItems.map((product) => (
+                                        <div key={product.id} className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800">
+                                            <ProductCard
+                                                product={product}
+                                                onProductSelect={handleProductSelect}
+                                                compact
+                                            />
+                                            <div className="-mt-1 flex items-center justify-between border-t border-slate-200/70 bg-white px-3 py-1.5 dark:border-slate-700 dark:bg-slate-800">
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                                                    <AcademicCapIcon className="h-3.5 w-3.5" />
+                                                    {(() => {
+                                                        const sem = product.semester;
+                                                        if (sem === 'All' || sem === 'Any') return 'All Semesters';
+                                                        const n = Number(sem);
+                                                        return Number.isNaN(n) ? `${sem}` : `Sem ${n}`;
+                                                    })()}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
-                    ) : !showPrimeBanner ? (
-                        <NoResultsFound onExploreAll={handleExploreAll} />
-                    ) : null
-                )}
-                {status === 'failed' && <p>Error loading products.</p>}
-                {/* Pagination controls */}
-                <div className="flex items-center justify-center gap-2 sm:gap-3 mt-6">
+
+                                <div className="mt-6 flex items-center justify-center gap-2 sm:gap-3">
                     <button
                         onClick={() => goToPage(currentPage - 1)}
                         disabled={currentPage === 1}
-                        className="px-3 py-1.5 text-sm rounded border border-slate-300 disabled:opacity-50 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
+                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-900"
                     >
                         Prev
                     </button>
-                    {/* Show a small window of pages */}
+
                     {Array.from({ length: totalPages }).slice(
                         Math.max(0, currentPage - 3),
                         Math.min(totalPages, currentPage + 2)
@@ -401,10 +433,10 @@ const Marketplace = ({ onNavigate, initialCategory, initialSearch }) => {
                             <button
                                 key={pageNum}
                                 onClick={() => goToPage(pageNum)}
-                                className={`px-3 py-1.5 text-sm rounded border ${
+                                className={`rounded-lg border px-3 py-1.5 text-sm ${
                                     pageNum === currentPage
-                                      ? 'bg-amber-400 text-slate-900 border-amber-400'
-                                      : 'border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800'
+                                      ? 'border-cyan-600 bg-cyan-600 text-white'
+                                      : 'border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-900'
                                 }`}
                             >
                                 {pageNum}
@@ -414,12 +446,18 @@ const Marketplace = ({ onNavigate, initialCategory, initialSearch }) => {
                     <button
                         onClick={() => goToPage(currentPage + 1)}
                         disabled={currentPage === totalPages}
-                        className="px-3 py-1.5 text-sm rounded border border-slate-300 disabled:opacity-50 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
+                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-900"
                     >
                         Next
                     </button>
                 </div>
+                            </section>
+                        ) : !showPrimeBanner ? (
+                            <NoResultsFound onExploreAll={handleExploreAll} />
+                        ) : null
+                    )}
             </main>
+            </div>
         </div>
     );
 };

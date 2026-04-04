@@ -27,10 +27,10 @@ import SkillMarketplace from '../pages/SkillMarketplace';
 import AIChatbot from './common/AIChatbot';
 import AssignmentHelp from '../pages/services/AssignmentHelp';
 import { useGlobalState, actionTypes } from '../context/GlobalStateContext';
-import { auth } from '../utils/api';
+import { auth, cart as cartApi, products as productsApi, wishlist as wishlistApi } from '../utils/api';
 
 const AppContent = () => {
-  const { dispatch } = useGlobalState();
+  const { state, dispatch } = useGlobalState();
 
   // Persist page + params + selected product
   const [currentPage, setCurrentPage] = useState(() => localStorage.getItem('mcm.currentPage') || 'Home');
@@ -46,6 +46,79 @@ const AppContent = () => {
   // const { state } = useGlobalState();
 
   // Handle backend OAuth redirect: /#token=... or /#authError=...
+  useEffect(() => {
+    if (state.products.status !== 'idle') {
+      return;
+    }
+
+    dispatch({ type: actionTypes.FETCH_PRODUCTS_START });
+    productsApi.getAll()
+      .then((response) => {
+        dispatch({ type: actionTypes.FETCH_PRODUCTS_SUCCESS, payload: response.data });
+      })
+      .catch(() => {
+        dispatch({ type: actionTypes.FETCH_PRODUCTS_FAIL, payload: 'Failed to load products' });
+      });
+  }, [state.products.status, dispatch]);
+
+  useEffect(() => {
+    if (!state.isLoggedIn) {
+      return;
+    }
+
+    cartApi.get(state.user?.id)
+      .then((response) => {
+        const backendItems = Array.isArray(response.data?.items) ? response.data.items : [];
+        const mappedItems = backendItems.reduce((acc, item) => {
+          acc[item.id] = {
+            id: item.id,
+            name: item.name,
+            price: Number(item.price || 0),
+            imageUrl: item.imageUrl,
+            quantity: Number(item.quantity || 1),
+          };
+          return acc;
+        }, {});
+
+        dispatch({ type: actionTypes.SET_CART, payload: { items: mappedItems } });
+      })
+      .catch(() => {
+        // Keep local cart if backend cart fetch fails.
+      });
+
+    let localWishlistIds = [];
+    try {
+      const parsed = JSON.parse(localStorage.getItem('mcm.wishlist') || '[]');
+      localWishlistIds = Array.isArray(parsed)
+        ? parsed
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id) && id > 0)
+        : [];
+    } catch {
+      localWishlistIds = [];
+    }
+
+    wishlistApi.sync(localWishlistIds)
+      .then((response) => {
+        dispatch({
+          type: actionTypes.SET_WISHLIST,
+          payload: Array.isArray(response.data?.productIds) ? response.data.productIds : []
+        });
+      })
+      .catch(() => {
+        wishlistApi.get()
+          .then((response) => {
+            dispatch({
+              type: actionTypes.SET_WISHLIST,
+              payload: Array.isArray(response.data?.productIds) ? response.data.productIds : []
+            });
+          })
+          .catch(() => {
+            // Keep local wishlist if backend sync fails.
+          });
+      });
+  }, [state.isLoggedIn, state.user?.id, dispatch]);
+
   useEffect(() => {
     const hash = window.location.hash;
     if (!hash || hash.length <= 1) {
@@ -75,6 +148,10 @@ const AppContent = () => {
       .then((userProfile) => {
         localStorage.setItem('user', JSON.stringify(userProfile));
         dispatch({ type: actionTypes.SET_USER, payload: userProfile });
+        dispatch({
+          type: actionTypes.SET_WISHLIST,
+          payload: Array.isArray(userProfile?.wishlistProductIds) ? userProfile.wishlistProductIds : []
+        });
         setCurrentPage('Home');
         setParams({});
         localStorage.setItem('mcm.currentPage', 'Home');
@@ -202,7 +279,7 @@ const AppContent = () => {
       case 'SkillMarketplace':
         return <SkillMarketplace onNavigate={handleNavigate} />;
       case 'AssignmentHelp':
-        return <AssignmentHelp onNavigate={handleNavigate} />;
+        return <AssignmentHelp onNavigate={handleNavigate} selectedService={params.service} />;
       default:
         return <Home onNavigate={handleNavigate} />;
     }

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from '../../context/LanguageContext';
-import { useGlobalState } from '../../context/GlobalStateContext';
+import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import {
   SearchIcon,
   ShoppingCartIcon,
@@ -18,7 +18,7 @@ const Navbar = ({ onCartClick, onNavigate }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const { t } = useTranslation();
-  const { state } = useGlobalState();
+  const { state, dispatch } = useGlobalState();
   const cartItemCount = Object.values(state.cart.items).reduce((sum, item) => sum + item.quantity, 0);
   const [searchTerm, setSearchTerm] = useState("");
   const [suggestions, setSuggestions] = useState([]);
@@ -76,6 +76,16 @@ const Navbar = ({ onCartClick, onNavigate }) => {
       handleSearchChange({target: {value: transcript}});
     };
     recognition.start();
+  };
+
+  const handleAccountClick = () => {
+    onNavigate(state.isLoggedIn ? 'Account' : 'Login');
+  };
+
+  const handleLogout = () => {
+    dispatch({ type: actionTypes.LOGOUT });
+    setIsMenuOpen(false);
+    onNavigate('Home');
   };
 
   // Clean, reusable icon button (no gradient)
@@ -156,6 +166,47 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                       {link.name}
                     </button>
                   ))}
+                  <div className="border-t border-slate-200 dark:border-slate-700 mt-1 pt-1">
+                    {state.isLoggedIn ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => { onNavigate('Account'); setIsMenuOpen(false); }}
+                          className="block w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                          role="menuitem"
+                        >
+                          Account
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleLogout}
+                          className="block w-full text-left px-4 py-2 text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                          role="menuitem"
+                        >
+                          Logout
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => { onNavigate('Login'); setIsMenuOpen(false); }}
+                          className="block w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                          role="menuitem"
+                        >
+                          {t('login')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { onNavigate('Signup'); setIsMenuOpen(false); }}
+                          className="block w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                          role="menuitem"
+                        >
+                          {t('signup')}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -247,7 +298,11 @@ const Navbar = ({ onCartClick, onNavigate }) => {
 
           {/* Right side icons */}
           <div className="flex items-center space-x-1 md:space-x-2">
-            <IconButton onClick={() => onNavigate('Account')} title="Account" aria="Account">
+            <IconButton
+              onClick={handleAccountClick}
+              title={state.isLoggedIn ? 'Account' : 'Login'}
+              aria={state.isLoggedIn ? 'Account' : 'Login'}
+            >
               <UserCircleIcon />
             </IconButton>
 
@@ -284,18 +339,37 @@ const Navbar = ({ onCartClick, onNavigate }) => {
 
             {/* Auth buttons */}
             <div className="hidden md:flex items-center ml-2">
-              <button
-                onClick={() => onNavigate('Login')}
-                className="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-slate-900 rounded-md text-sm font-semibold transition-colors"
-              >
-                {t('login')}
-              </button>
-              <button
-                onClick={() => onNavigate('Signup')}
-                className="ml-2 px-4 py-2 bg-amber-400 hover:bg-amber-500 text-slate-900 rounded-md text-sm font-semibold transition-colors"
-              >
-                {t('signup')}
-              </button>
+              {state.isLoggedIn ? (
+                <>
+                  <button
+                    onClick={() => onNavigate('Account')}
+                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-semibold transition-colors"
+                  >
+                    Account
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="ml-2 px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-md text-sm font-semibold transition-colors"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => onNavigate('Login')}
+                    className="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-slate-900 rounded-md text-sm font-semibold transition-colors"
+                  >
+                    {t('login')}
+                  </button>
+                  <button
+                    onClick={() => onNavigate('Signup')}
+                    className="ml-2 px-4 py-2 bg-amber-400 hover:bg-amber-500 text-slate-900 rounded-md text-sm font-semibold transition-colors"
+                  >
+                    {t('signup')}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

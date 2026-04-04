@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import { auth } from '../../utils/api';
+import googleIcon from '../../../assets/google-icon.svg';
 
 const Signup = ({ onNavigate }) => {
     const [email, setEmail] = useState('');
@@ -103,8 +104,14 @@ const Signup = ({ onNavigate }) => {
                     <button
                         type="button"
                         onClick={handleGoogleSignUp}
-                        className="w-full py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-900 font-medium border border-slate-300"
+                        className="w-full py-2.5 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-semibold border border-slate-300 dark:border-slate-500 hover:bg-slate-50 dark:hover:bg-slate-600 hover:shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-800"
                     >
+                        <img
+                            src={googleIcon}
+                            alt=""
+                            aria-hidden="true"
+                            className="inline-block w-5 h-5 mr-2"
+                        />
                         Sign up with Google
                     </button>
                 </div>
