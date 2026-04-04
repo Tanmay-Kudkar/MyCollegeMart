@@ -56,8 +56,8 @@ const PreviewModal = ({ file, onClose }) => (
   </div>
 );
 
-const AssignmentHelp = ({ selectedService }) => {
-  const { dispatch } = useGlobalState();
+const AssignmentHelp = ({ selectedService, onNavigate }) => {
+  const { state, dispatch } = useGlobalState();
   const [serviceType, setServiceType] = useState('Assignment');
   const [subject, setSubject] = useState('');
   const [topic, setTopic] = useState('');
@@ -131,6 +131,15 @@ const AssignmentHelp = ({ selectedService }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!state.isLoggedIn) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Please sign in to continue with payment.', type: 'error' }
+      });
+      onNavigate?.('Login');
+      return;
+    }
+
     if (files.length === 0) {
       dispatch({
         type: actionTypes.ADD_NOTIFICATION,
@@ -154,13 +163,26 @@ const AssignmentHelp = ({ selectedService }) => {
       formData.append('branch', branch);
       formData.append('semester', semester);
       formData.append('deadline', deadline);
-      formData.append('totalAmount', String(deadlineOptions[deadline].price));
+      formData.append('totalAmount', String(payableAmount));
 
       files.forEach((item) => {
         formData.append('files', item.file);
       });
 
-      await assignmentHelp.submitRequest(formData);
+      const checkoutResponse = await assignmentHelp.createCheckoutOrder(formData);
+      const checkoutData = checkoutResponse?.data;
+
+      if (checkoutData?.requiresPayment && checkoutData?.requestId) {
+        dispatch({
+          type: actionTypes.ADD_NOTIFICATION,
+          payload: { message: 'Request saved. Complete payment to confirm submission.', type: 'success' }
+        });
+        onNavigate?.('AssignmentCheckout', {
+          ...checkoutData,
+          filesAttached: files.length,
+        });
+        return;
+      }
 
       dispatch({
         type: actionTypes.ADD_NOTIFICATION,
@@ -169,10 +191,15 @@ const AssignmentHelp = ({ selectedService }) => {
 
       resetForm();
     } catch (error) {
+      const message = error?.response?.data?.message || error?.message || 'Failed to prepare payment. Please try again.';
       dispatch({
         type: actionTypes.ADD_NOTIFICATION,
-        payload: { message: error?.message || 'Failed to submit request. Please try again.', type: 'error' }
+        payload: { message, type: 'error' }
       });
+
+      if (error?.response?.status === 401) {
+        onNavigate?.('Login');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -182,6 +209,7 @@ const AssignmentHelp = ({ selectedService }) => {
 
   const selectedDeadline = deadlineOptions[deadline];
   const selectedPrimeDeadline = primeDeadlineOptions[deadline];
+  const payableAmount = state.user?.isPrimeMember ? selectedPrimeDeadline.price : selectedDeadline.price;
 
   return (
     <div className="relative min-h-screen py-10">
@@ -197,7 +225,7 @@ const AssignmentHelp = ({ selectedService }) => {
       >
         <section className="rounded-[24px] border border-slate-200/80 bg-white/95 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800/95 sm:p-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-400">Assignment Utility Bar</p>
-          <h1 className="mcm-display mt-1 text-4xl font-extrabold text-slate-900 dark:text-white">Assignment & Practical Help</h1>
+          <h1 className="mcm-display mt-1 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">Assignment & Practical Help</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Get expert guidance from experienced tutors and submit all supporting files in one secure flow.</p>
           {selectedService?.title && (
             <div className="mt-4 inline-flex items-center rounded-full bg-cyan-100 px-3 py-1 text-xs font-semibold text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300">
@@ -374,7 +402,7 @@ const AssignmentHelp = ({ selectedService }) => {
                 disabled={isSubmitting}
                 className="mt-5 w-full rounded-lg bg-cyan-700 py-3 font-bold text-white shadow-md transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isSubmitting ? 'Submitting...' : `Submit Request (Total: ₹${selectedDeadline.price})`}
+                {isSubmitting ? 'Preparing Payment...' : `Proceed to Payment (Total: ₹${payableAmount})`}
               </button>
             </div>
 

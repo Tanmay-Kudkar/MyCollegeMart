@@ -25,6 +25,9 @@ public class AssignmentHelpRequest {
     @Column(name = "skill_service_id")
     private Long skillServiceId;
 
+    @Column(name = "user_id")
+    private Long userId;
+
     @Column(name = "service_type", nullable = false, length = 64)
     private String serviceType;
 
@@ -49,8 +52,29 @@ public class AssignmentHelpRequest {
     @Column(name = "total_amount", nullable = false)
     private Double totalAmount;
 
+    @Column(name = "amount_paid", nullable = false)
+    private Double amountPaid;
+
     @Column(nullable = false, length = 32)
     private String status;
+
+    @Column(name = "payment_method", nullable = false, length = 32)
+    private String paymentMethod;
+
+    @Column(name = "payment_status", nullable = false, length = 32)
+    private String paymentStatus;
+
+    @Column(nullable = false, length = 8)
+    private String currency;
+
+    @Column(name = "razorpay_order_id")
+    private String razorpayOrderId;
+
+    @Column(name = "razorpay_payment_id")
+    private String razorpayPaymentId;
+
+    @Column(name = "razorpay_signature")
+    private String razorpaySignature;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

@@ -33,6 +33,11 @@ public class MediaAssetService {
         return mediaAssetRepository.findByOwnerTypeAndOwnerIdOrderByDisplayOrderAscIdAsc(ownerType, ownerId);
     }
 
+    public List<MediaAsset> findByOwnerAndType(String ownerType, Long ownerId, String mediaType) {
+        return mediaAssetRepository.findByOwnerTypeAndOwnerIdAndMediaTypeOrderByDisplayOrderAscIdAsc(ownerType, ownerId,
+                mediaType);
+    }
+
     public List<MediaAsset> storeFiles(String ownerType, Long ownerId, String mediaType, List<MultipartFile> files) {
         if (files == null || files.isEmpty()) {
             return List.of();
@@ -50,6 +55,11 @@ public class MediaAssetService {
         }
 
         return storedAssets;
+    }
+
+    public List<MediaAsset> replaceFiles(String ownerType, Long ownerId, String mediaType, List<MultipartFile> files) {
+        mediaAssetRepository.deleteByOwnerTypeAndOwnerIdAndMediaType(ownerType, ownerId, mediaType);
+        return storeFiles(ownerType, ownerId, mediaType, files);
     }
 
     public MediaAsset storeSingle(

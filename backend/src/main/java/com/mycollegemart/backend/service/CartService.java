@@ -43,6 +43,9 @@ public class CartService {
         int safeQuantity = (quantity == null || quantity <= 0) ? 1 : quantity;
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+        if (isOutOfStock(product)) {
+            throw new IllegalStateException("This item is currently out of stock");
+        }
 
         Cart cart = getCartByUserId(userId);
         Map<Long, Integer> items = cart.getProducts();
@@ -61,6 +64,11 @@ public class CartService {
         if (quantity == null || quantity <= 0) {
             items.remove(productId);
         } else {
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+            if (isOutOfStock(product)) {
+                throw new IllegalStateException("This item is currently out of stock");
+            }
             items.put(productId, quantity);
         }
 
@@ -110,6 +118,8 @@ public class CartService {
             row.put("price", price);
             row.put("imageUrl", product.getImageUrl());
             row.put("quantity", quantity);
+            row.put("inStock", product.getInStock());
+            row.put("stockQuantity", product.getStockQuantity());
             row.put("lineTotal", lineTotal);
             items.add(row);
         }
@@ -119,5 +129,18 @@ public class CartService {
         response.put("items", items);
         response.put("subtotal", subtotal);
         return response;
+    }
+
+    private boolean isOutOfStock(Product product) {
+        if (product == null) {
+            return true;
+        }
+
+        if (!Boolean.TRUE.equals(product.getInStock())) {
+            return true;
+        }
+
+        Integer stockQuantity = product.getStockQuantity();
+        return stockQuantity != null && stockQuantity <= 0;
     }
 }

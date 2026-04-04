@@ -4,9 +4,18 @@ import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import { auth } from '../../utils/api';
 import googleIcon from '../../../assets/google-icon.svg';
 
-const Login = ({ onNavigate }) => {
+const INPUT_CLASS = 'mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:focus:ring-cyan-900/40';
+
+const Login = ({ onNavigate, defaultAccountType }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [accountType, setAccountType] = useState(
+        (defaultAccountType || '').toUpperCase() === 'MASTER'
+            ? 'MASTER'
+            : (defaultAccountType || '').toUpperCase() === 'MERCHANT'
+                ? 'MERCHANT'
+                : 'INDIVIDUAL'
+    );
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const { dispatch } = useGlobalState();
@@ -18,7 +27,7 @@ const Login = ({ onNavigate }) => {
         setIsLoading(true);
         setError('');
         try {
-            const response = await auth.login({ email, password });
+            const response = await auth.login({ email, password, accountType });
             localStorage.setItem('token', response.token);
 
             const userProfile = await auth.getCurrentUser();
@@ -36,86 +45,161 @@ const Login = ({ onNavigate }) => {
 
     const handleGoogleSignIn = () => {
         setError('');
-        auth.startGoogleLogin();
+        if (accountType === 'MASTER') {
+            setError('Master portal supports secure email/password sign in only.');
+            return;
+        }
+        auth.startGoogleLoginForAccountType(accountType);
     };
 
     return (
-        <div className="min-h-[80vh] flex flex-col items-center justify-start bg-gradient-to-b from-slate-100 via-slate-100 to-slate-200 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 px-4 pt-10 pb-8 transition-colors">
+        <div className="min-h-[82vh] bg-slate-100 px-4 py-8 transition-colors dark:bg-slate-900 sm:px-6 lg:px-8">
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
-                className="w-full max-w-sm p-7 border border-slate-300/90 dark:border-slate-700 rounded-2xl bg-white/95 dark:bg-slate-800/90 shadow-xl shadow-slate-300/35 dark:shadow-black/35 backdrop-blur"
+                className="mx-auto grid w-full max-w-6xl items-stretch gap-6 lg:grid-cols-[1.1fr_minmax(0,460px)]"
             >
-                <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white mb-5">Sign in</h1>
-                <form className="space-y-4" onSubmit={handleSubmit}>
+                <section className="hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-100 p-8 shadow-sm dark:border-slate-700 dark:from-slate-800 dark:to-slate-900 lg:flex lg:flex-col lg:justify-between">
                     <div>
-                        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Email Address</label>
-                        <input
-                            type="email"
-                            name="email"
-                            value={email}
-                            onChange={e => setEmail(e.target.value)}
-                            required
-                            className="w-full px-3.5 py-2.5 rounded-lg border border-slate-400/90 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow duration-200 focus:shadow-[0_0_0_3px_rgba(245,158,11,0.16)]"
-                        />
+                        <p className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:border-cyan-800/50 dark:bg-cyan-900/30 dark:text-cyan-300">
+                            Secure Student Commerce
+                        </p>
+                        <h2 className="mcm-display mt-4 text-4xl font-bold text-slate-900 dark:text-white">Welcome Back to MyCollegeMart</h2>
+                        <p className="mt-3 text-slate-600 dark:text-slate-300">
+                            Sign in to continue shopping verified campus listings, track orders, manage wallet, and switch to merchant tools whenever needed.
+                        </p>
                     </div>
-                    <div>
-                        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Password</label>
-                        <input
-                            type="password"
-                            name="password"
-                            value={password}
-                            onChange={e => setPassword(e.target.value)}
-                            required
-                            className="w-full px-3.5 py-2.5 rounded-lg border border-slate-400/90 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow duration-200 focus:shadow-[0_0_0_3px_rgba(245,158,11,0.16)]"
-                        />
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-800/70">
+                            <p className="text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Fast Checkout</p>
+                            <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Saved Cart + Wallet</p>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-800/70">
+                            <p className="text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Seller Ready</p>
+                            <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Merchant Dashboard</p>
+                        </div>
                     </div>
-                    <button
-                        type="submit"
-                        disabled={isLoading}
-                        className="w-full py-2.5 rounded-lg bg-gradient-to-b from-amber-300 to-amber-400 hover:from-amber-400 hover:to-amber-500 text-slate-900 font-semibold shadow-md border border-amber-500/90 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
-                    >
-                        {isLoading ? 'Signing in...' : 'Continue'}
-                    </button>
-                    {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
-                </form>
-                <p className="text-xs leading-5 text-slate-600 dark:text-slate-400 mt-4">
-                    By continuing, you agree to MyCollegeMart's Conditions of Use and Privacy Notice.
-                </p>
-                <div className="relative my-7">
-                    <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-slate-300 dark:border-slate-600" />
+                </section>
+
+                <section className="w-full rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-8">
+                    <h1 className="mcm-display text-4xl font-bold tracking-tight text-slate-900 dark:text-white">Sign in</h1>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Access your student or merchant account.</p>
+
+                    <div className="mt-6 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Choose Portal</p>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                            <button
+                                type="button"
+                                onClick={() => setAccountType('INDIVIDUAL')}
+                                className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${accountType === 'INDIVIDUAL'
+                                    ? 'bg-cyan-700 text-white'
+                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'}`}
+                            >
+                                Individual
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setAccountType('MERCHANT')}
+                                className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${accountType === 'MERCHANT'
+                                    ? 'bg-cyan-700 text-white'
+                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'}`}
+                            >
+                                Business / Merchant
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setAccountType('MASTER')}
+                                className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${accountType === 'MASTER'
+                                    ? 'bg-slate-900 text-white dark:bg-cyan-700'
+                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'}`}
+                            >
+                                Master
+                            </button>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                            Individual: buy and request study services. Merchant: list products. Master: full A to Z control.
+                        </p>
                     </div>
-                    <div className="relative flex justify-center">
-                        <span className="px-3 py-0.5 text-xs uppercase tracking-[0.2em] bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-600 rounded-full">or</span>
+
+                    <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
+                        <div>
+                            <label className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-200">Email Address</label>
+                            <input
+                                type="email"
+                                name="email"
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
+                                required
+                                className={INPUT_CLASS}
+                            />
+                        </div>
+                        <div>
+                            <label className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-200">Password</label>
+                            <input
+                                type="password"
+                                name="password"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                required
+                                className={INPUT_CLASS}
+                            />
+                        </div>
+
+                        {error && (
+                            <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-800/40 dark:bg-rose-900/20 dark:text-rose-300">
+                                {error}
+                            </p>
+                        )}
+
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full rounded-xl border border-amber-500 bg-amber-400 py-2.5 font-semibold text-slate-900 transition-colors hover:bg-amber-500 disabled:opacity-60"
+                        >
+                            {isLoading ? 'Signing in...' : 'Continue'}
+                        </button>
+                    </form>
+
+                    <p className="mt-4 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                        By continuing, you agree to MyCollegeMart&apos;s Conditions of Use and Privacy Notice.
+                    </p>
+
+                    <div className="relative my-6">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-slate-200 dark:border-slate-700" />
+                        </div>
+                        <div className="relative flex justify-center">
+                            <span className="rounded-full border border-slate-200 bg-white px-3 py-0.5 text-xs uppercase tracking-[0.2em] text-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400">or</span>
+                        </div>
                     </div>
-                </div>
-                <div className="w-full">
+
                     <button
                         type="button"
                         onClick={handleGoogleSignIn}
-                        className="group w-full py-2.5 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-semibold border border-slate-300 dark:border-slate-500 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-600 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-800"
+                        className="group w-full rounded-xl border border-slate-300 bg-white py-2.5 font-semibold text-slate-900 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
                     >
                         <img
                             src={googleIcon}
                             alt=""
                             aria-hidden="true"
-                            className="inline-block w-5 h-5 mr-2 align-[-2px] transition-transform duration-200 group-hover:scale-110"
+                            className="mr-2 inline-block h-5 w-5 align-[-2px]"
                         />
                         Continue with Google
                     </button>
-                </div>
+
+                    <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center dark:border-slate-700 dark:bg-slate-900/50">
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">New to MyCollegeMart?</p>
+                        <button
+                            onClick={() => onNavigate('Signup', { accountType: accountType === 'MASTER' ? 'INDIVIDUAL' : accountType })}
+                            className="mt-2.5 w-full rounded-xl border border-amber-500 bg-amber-400 py-2.5 font-semibold text-slate-900 transition-colors hover:bg-amber-500"
+                        >
+                            Create your {accountType === 'MERCHANT' ? 'Merchant' : 'Student'} account
+                        </button>
+                    </div>
+                </section>
             </motion.div>
-            <div className="w-full max-w-sm mt-4 text-center rounded-xl border border-slate-300/90 dark:border-slate-700 bg-white/80 dark:bg-slate-800/70 p-4 shadow-md shadow-slate-300/20 dark:shadow-black/20 backdrop-blur-sm">
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">New to MyCollegeMart?</p>
-                <button
-                    onClick={() => onNavigate('Signup')}
-                    className="w-full mt-2.5 py-2.5 px-4 rounded-lg bg-gradient-to-b from-amber-300 to-amber-400 hover:from-amber-400 hover:to-amber-500 text-slate-900 font-semibold border border-amber-500/90 shadow-sm transition-all duration-200 hover:-translate-y-0.5"
-                >
-                    Create your MyCollegeMart account
-                </button>
-            </div>
         </div>
     );
 };

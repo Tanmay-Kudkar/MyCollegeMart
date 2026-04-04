@@ -52,6 +52,8 @@ public class CartController {
             return ResponseEntity.ok(cartService.addItem(resolvedUserId, request.productId(), request.quantity()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage()));
         }
     }
 
@@ -65,7 +67,13 @@ public class CartController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Missing or invalid token"));
         }
 
-        return ResponseEntity.ok(cartService.updateItemQuantity(resolvedUserId, productId, request.quantity()));
+        try {
+            return ResponseEntity.ok(cartService.updateItemQuantity(resolvedUserId, productId, request.quantity()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage()));
+        }
     }
 
     @DeleteMapping("/item/{productId}")

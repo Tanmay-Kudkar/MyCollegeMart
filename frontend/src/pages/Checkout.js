@@ -259,7 +259,7 @@ const Checkout = ({ onNavigate }) => {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mx-auto max-w-6xl space-y-6">
         <section className="rounded-[24px] border border-slate-200/80 bg-white/95 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800/95 sm:p-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-400">Secure Checkout</p>
-          <h1 className="mcm-display mt-1 text-4xl font-extrabold text-slate-900 dark:text-white">Review and Complete Payment</h1>
+          <h1 className="mcm-display mt-1 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">Review and Complete Payment</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Confirm delivery details, choose payment mode, and place your order with protected checkout.</p>
         </section>
 
@@ -336,7 +336,7 @@ const Checkout = ({ onNavigate }) => {
               <h2 className="mcm-display text-2xl font-bold text-slate-900 dark:text-white">Order Items</h2>
               <ul className="mt-4 divide-y divide-slate-200 dark:divide-slate-700">
                 {cartItems.map((item) => (
-                  <li key={item.id} className="py-4 flex justify-between items-center gap-4">
+                  <li key={item.id} className="py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3 min-w-0">
                       {item.imageUrl ? (
                         <img src={item.imageUrl} alt={item.name} className="w-12 h-12 rounded-md object-cover" />

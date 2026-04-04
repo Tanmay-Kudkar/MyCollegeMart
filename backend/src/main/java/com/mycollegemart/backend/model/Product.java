@@ -43,6 +43,15 @@ public class Product {
     @Column(name = "external_video_url", length = 1024)
     private String externalVideoUrl;
 
+    @Column(name = "listed_by_user_id")
+    private Long listedByUserId;
+
+    @Column(name = "in_stock", nullable = false)
+    private Boolean inStock = true;
+
+    @Column(name = "stock_quantity")
+    private Integer stockQuantity;
+
     @CreationTimestamp
     private Instant createdAt;
 }

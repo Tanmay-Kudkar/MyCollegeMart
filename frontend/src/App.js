@@ -9,7 +9,7 @@ function App() {
     <ThemeProvider>
       <LanguageProvider>
         <GlobalStateProvider>
-          <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+          <div className="min-h-screen overflow-x-hidden bg-slate-50 dark:bg-slate-900">
             <AppContent />
             <NotificationContainer />
           </div>

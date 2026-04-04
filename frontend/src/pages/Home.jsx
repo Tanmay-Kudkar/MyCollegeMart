@@ -7,11 +7,28 @@ const Home = ({ onNavigate }) => {
   const { state } = useGlobalState();
 
   const allProducts = useMemo(
-    () => (Array.isArray(state.products?.items) ? state.products.items : []),
+    () => {
+      const items = Array.isArray(state.products?.items) ? state.products.items : [];
+      const seen = new Set();
+
+      return items.filter((item) => {
+        const key = item?.id != null
+          ? `id:${item.id}`
+          : `fallback:${item?.name || 'unknown'}|${item?.category || 'misc'}|${item?.price || 0}`;
+
+        if (seen.has(key)) {
+          return false;
+        }
+
+        seen.add(key);
+        return true;
+      });
+    },
     [state.products?.items]
   );
 
-  const featuredProducts = useMemo(() => allProducts.slice(0, 8), [allProducts]);
+  const curatedDeals = useMemo(() => allProducts.slice(0, 4), [allProducts]);
+  const featuredProducts = useMemo(() => allProducts.slice(4, 12), [allProducts]);
 
   const categoryCards = useMemo(() => {
     const buckets = new Map();
@@ -41,8 +58,7 @@ const Home = ({ onNavigate }) => {
     return [...buckets.values()].sort((a, b) => b.count - a.count).slice(0, 6);
   }, [allProducts]);
 
-  const heroSpotlight = featuredProducts[0] || null;
-  const curatedDeals = useMemo(() => featuredProducts.slice(0, 4), [featuredProducts]);
+  const heroSpotlight = allProducts[0] || null;
 
   const stats = useMemo(() => {
     const total = allProducts.length;
@@ -112,7 +128,7 @@ const Home = ({ onNavigate }) => {
                 </button>
               </div>
 
-              <div className="mt-8 grid max-w-xl grid-cols-3 gap-3">
+              <div className="mt-8 grid max-w-xl grid-cols-2 gap-3 sm:grid-cols-3">
                 <div className="rounded-xl border border-white/20 bg-white/[0.11] p-3 backdrop-blur-sm">
                   <p className="text-[11px] uppercase tracking-[0.12em] text-white/70">Live Listings</p>
                   <p className="mt-1 text-xl font-bold">{stats.total}</p>
@@ -129,7 +145,7 @@ const Home = ({ onNavigate }) => {
             </div>
           </div>
 
-          <div className="border-l border-slate-200/80 bg-slate-50/90 p-5 dark:border-slate-700 dark:bg-slate-900/70 sm:p-6">
+          <div className="border-t border-slate-200/80 bg-slate-50/90 p-5 dark:border-slate-700 dark:bg-slate-900/70 sm:p-6 lg:border-t-0 lg:border-l">
             <h2 className="mcm-display text-lg font-bold text-slate-900 dark:text-white">Quick Panel</h2>
             <div className="mt-4 space-y-3">
               <button
@@ -172,7 +188,6 @@ const Home = ({ onNavigate }) => {
 
             {heroSpotlight && (
               <motion.button
-                whileHover={{ y: -2 }}
                 type="button"
                 onClick={() => onNavigate('ProductDetail', heroSpotlight)}
                 className="mt-5 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm dark:border-slate-700 dark:bg-slate-800"
@@ -195,7 +210,7 @@ const Home = ({ onNavigate }) => {
       </section>
 
       <section className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
-        <div className="mb-4 flex items-end justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="mcm-display text-2xl font-bold text-slate-900 dark:text-white">Shop by Category</h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Explore the most active segments in the student marketplace.</p>
@@ -214,21 +229,21 @@ const Home = ({ onNavigate }) => {
               <button
                 key={category.name}
                 onClick={() => onNavigate('Marketplace', { category: category.name })}
-                className="group relative h-36 overflow-hidden rounded-2xl border border-slate-200/70 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700"
+                className="group relative h-36 overflow-hidden rounded-2xl border border-slate-200/70 text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200 hover:shadow-xl hover:shadow-cyan-100/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 dark:border-slate-700 dark:hover:border-slate-600 dark:hover:shadow-cyan-950/20"
               >
                 {category.imageUrl ? (
                   <img
                     src={category.imageUrl}
                     alt={category.name}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
                   />
                 ) : (
                   <div className="h-full w-full bg-gradient-to-br from-slate-300 to-slate-400 dark:from-slate-700 dark:to-slate-600" />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent transition-opacity duration-300 group-hover:from-black/85 group-hover:via-black/25" />
                 <div className="absolute inset-x-0 bottom-0 p-2.5">
-                  <p className="line-clamp-1 text-sm font-semibold text-white">{category.name}</p>
-                  <p className="text-[11px] text-white/80">
+                  <p className="line-clamp-1 text-sm font-semibold text-white transition-colors group-hover:text-cyan-100">{category.name}</p>
+                  <p className="text-[11px] text-white/80 transition-colors group-hover:text-cyan-100/90">
                     {category.count} items from ₹{Math.max(0, Number(category.minPrice || 0)).toFixed(0)}
                   </p>
                 </div>
@@ -241,14 +256,14 @@ const Home = ({ onNavigate }) => {
       </section>
 
       <section className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
-        <div className="mb-4 flex items-end justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="mcm-display text-2xl font-bold text-slate-900 dark:text-white">Campus Hot Deals</h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Freshly picked listings with competitive student pricing.</p>
           </div>
           <button
             onClick={() => onNavigate('Marketplace')}
-            className="text-sm font-semibold text-cyan-700 hover:underline dark:text-cyan-400"
+            className="text-sm font-semibold text-cyan-700 transition-colors hover:text-cyan-800 hover:underline hover:underline-offset-4 dark:text-cyan-400 dark:hover:text-cyan-300"
           >
             View all deals
           </button>
@@ -258,19 +273,27 @@ const Home = ({ onNavigate }) => {
           {curatedDeals.map((item) => (
             <motion.div
               key={`deal-${item.id}`}
-              whileHover={{ y: -3 }}
-              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition dark:border-slate-700 dark:bg-slate-800"
+              whileHover={{ y: -6 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-300 hover:border-cyan-200 hover:shadow-xl hover:shadow-cyan-100/70 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600 dark:hover:shadow-cyan-950/20"
             >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-700 dark:text-cyan-400">
+              <p className="inline-flex rounded-full bg-cyan-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-700 transition-colors group-hover:bg-cyan-100 dark:bg-cyan-900/25 dark:text-cyan-300 dark:group-hover:bg-cyan-900/40">
                 {item.isPrimeExclusive ? 'Prime Pick' : 'Limited Drop'}
               </p>
-              <h3 className="mt-1 line-clamp-2 min-h-[2.75rem] text-base font-bold text-slate-900 dark:text-white">{item.name}</h3>
-              <img src={item.imageUrl} alt={item.name} className="mt-3 h-28 w-full rounded-xl object-cover" />
+              <h3 className="mt-2 line-clamp-2 min-h-[2.75rem] text-base font-bold text-slate-900 transition-colors group-hover:text-cyan-800 dark:text-white dark:group-hover:text-cyan-300">{item.name}</h3>
+              <div className="relative mt-3 overflow-hidden rounded-xl">
+                <img
+                  src={item.imageUrl}
+                  alt={item.name}
+                  className="h-28 w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
+                />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-900/30 via-slate-900/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+              </div>
               <div className="mt-3 flex items-center justify-between">
-                <span className="font-bold text-cyan-700 dark:text-cyan-400">₹{Number(item.price || 0).toFixed(2)}</span>
+                <span className="font-bold text-cyan-700 transition-colors group-hover:text-cyan-800 dark:text-cyan-400 dark:group-hover:text-cyan-300">₹{Number(item.price || 0).toFixed(2)}</span>
                 <button
                   onClick={() => onNavigate('ProductDetail', item)}
-                  className="text-sm font-semibold text-slate-700 hover:text-cyan-700 dark:text-slate-200 dark:hover:text-cyan-400"
+                  className="rounded-full px-3 py-1 text-sm font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:bg-cyan-50 hover:text-cyan-700 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:text-cyan-300"
                 >
                   View deal
                 </button>
@@ -281,7 +304,7 @@ const Home = ({ onNavigate }) => {
       </section>
 
       <section className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
-        <div className="mb-4 flex items-end justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="mcm-display text-2xl font-bold text-slate-900 dark:text-white">Featured Products</h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Popular listings curated for quick discovery and faster checkout.</p>
@@ -311,7 +334,11 @@ const Home = ({ onNavigate }) => {
             animate={{ opacity: 1, y: 0 }}
             className="rounded-xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-700 dark:bg-slate-900"
           >
-            <p className="text-slate-600 dark:text-slate-300">No products loaded yet. Visit Marketplace to browse listings.</p>
+            <p className="text-slate-600 dark:text-slate-300">
+              {allProducts.length === 0
+                ? 'No products loaded yet. Visit Marketplace to browse listings.'
+                : 'More featured products will appear here as new listings are added.'}
+            </p>
             <button
               onClick={() => onNavigate('Marketplace')}
               className="mt-4 rounded-md bg-cyan-700 px-4 py-2 font-medium text-white hover:bg-cyan-800"

@@ -316,15 +316,15 @@ const Marketplace = ({ onNavigate, initialCategory, initialSearch }) => {
                                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Discover verified campus listings with fast filters and clear sorting.</p>
                             </div>
 
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                                <div className="shrink-0 whitespace-nowrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
                                     {allItems.length === 0 ? '0' : `${start + 1}-${Math.min(start + pageSize, allItems.length)}`} of {allItems.length}
                                 </div>
 
                                 <select
                                     value={pageSize}
                                     onChange={(e) => setPageSize(Number(e.target.value))}
-                                    className={FILTER_SELECT_STYLE}
+                                    className={`${FILTER_SELECT_STYLE} sm:w-auto sm:min-w-[9rem]`}
                                     title="Items per page"
                                 >
                                     <option value={12}>12 / page</option>
@@ -337,7 +337,7 @@ const Marketplace = ({ onNavigate, initialCategory, initialSearch }) => {
                                     value={searchTerm}
                                     onChange={e => setSearchTerm(e.target.value)}
                                     placeholder="Search products..."
-                                    className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 sm:w-72"
+                                    className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 sm:flex-1 sm:min-w-[16rem] sm:w-auto lg:w-72"
                                 />
                             </div>
                         </div>
@@ -394,14 +394,14 @@ const Marketplace = ({ onNavigate, initialCategory, initialSearch }) => {
                                 <h2 className="mcm-display mb-4 text-2xl font-bold text-slate-900 dark:text-white">Product Grid</h2>
                                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                                     {pagedItems.map((product) => (
-                                        <div key={product.id} className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800">
+                                        <div key={product.id} className="group overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200 hover:shadow-xl hover:shadow-cyan-100/70 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600 dark:hover:shadow-cyan-950/20">
                                             <ProductCard
                                                 product={product}
                                                 onProductSelect={handleProductSelect}
                                                 compact
                                             />
-                                            <div className="-mt-1 flex items-center justify-between border-t border-slate-200/70 bg-white px-3 py-1.5 dark:border-slate-700 dark:bg-slate-800">
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                                            <div className="-mt-1 flex items-center justify-between border-t border-slate-200/70 bg-white px-3 py-1.5 transition-colors duration-300 group-hover:bg-cyan-50/70 dark:border-slate-700 dark:bg-slate-800 dark:group-hover:bg-slate-800">
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 transition-all duration-300 group-hover:-translate-y-px group-hover:bg-cyan-100 group-hover:text-cyan-800 dark:bg-slate-700 dark:text-slate-300 dark:group-hover:bg-cyan-900/30 dark:group-hover:text-cyan-200">
                                                     <AcademicCapIcon className="h-3.5 w-3.5" />
                                                     {(() => {
                                                         const sem = product.semester;
@@ -419,7 +419,7 @@ const Marketplace = ({ onNavigate, initialCategory, initialSearch }) => {
                     <button
                         onClick={() => goToPage(currentPage - 1)}
                         disabled={currentPage === 1}
-                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-900"
+                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 disabled:pointer-events-none disabled:opacity-50 dark:border-slate-600 dark:hover:border-cyan-700 dark:hover:bg-slate-900 dark:hover:text-cyan-300"
                     >
                         Prev
                     </button>
@@ -435,8 +435,8 @@ const Marketplace = ({ onNavigate, initialCategory, initialSearch }) => {
                                 onClick={() => goToPage(pageNum)}
                                 className={`rounded-lg border px-3 py-1.5 text-sm ${
                                     pageNum === currentPage
-                                      ? 'border-cyan-600 bg-cyan-600 text-white'
-                                      : 'border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-900'
+                                      ? 'border-cyan-600 bg-cyan-600 text-white shadow-md shadow-cyan-500/40'
+                                      : 'border-slate-300 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 dark:border-slate-600 dark:hover:border-cyan-700 dark:hover:bg-slate-900 dark:hover:text-cyan-300'
                                 }`}
                             >
                                 {pageNum}
@@ -446,7 +446,7 @@ const Marketplace = ({ onNavigate, initialCategory, initialSearch }) => {
                     <button
                         onClick={() => goToPage(currentPage + 1)}
                         disabled={currentPage === totalPages}
-                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-900"
+                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 disabled:pointer-events-none disabled:opacity-50 dark:border-slate-600 dark:hover:border-cyan-700 dark:hover:bg-slate-900 dark:hover:text-cyan-300"
                     >
                         Next
                     </button>

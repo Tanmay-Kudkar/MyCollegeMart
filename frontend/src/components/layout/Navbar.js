@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from '../../context/LanguageContext';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
+import { settings as settingsApi } from '../../utils/api';
 import {
   SearchIcon,
   ShoppingCartIcon,
@@ -17,8 +18,9 @@ import {
 const Navbar = ({ onCartClick, onNavigate }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
-  const { t } = useTranslation();
+  const { language, setLanguage, t } = useTranslation();
   const { state, dispatch } = useGlobalState();
+  const isAdmin = Boolean(state.user?.isAdmin);
   const cartItemCount = Object.values(state.cart.items).reduce((sum, item) => sum + item.quantity, 0);
   const [searchTerm, setSearchTerm] = useState("");
   const [suggestions, setSuggestions] = useState([]);
@@ -88,6 +90,37 @@ const Navbar = ({ onCartClick, onNavigate }) => {
     onNavigate('Home');
   };
 
+  const applyLanguagePreference = async (nextLanguageInput) => {
+    const nextLanguage = (nextLanguageInput || 'EN').toUpperCase();
+    const currentLanguage = (language || 'en').toUpperCase();
+
+    if (nextLanguage === currentLanguage) {
+      return;
+    }
+
+    setLanguage(nextLanguage);
+
+    if (!state.isLoggedIn) {
+      return;
+    }
+
+    try {
+      await settingsApi.updateMe({ preferredLanguage: nextLanguage });
+    } catch {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: {
+          message: 'Language changed locally, but could not save to account settings.',
+          type: 'error'
+        }
+      });
+    }
+  };
+
+  const handleLanguageChange = (event) => {
+    applyLanguagePreference(event.target.value);
+  };
+
   // Clean, reusable icon button (no gradient)
   const IconButton = ({ onClick, title, aria, children, disabled = false, active = false }) => (
     <motion.button
@@ -130,11 +163,12 @@ const Navbar = ({ onCartClick, onNavigate }) => {
     { name: t('nav.about'), page: 'About' },
     { name: t('nav.contact'), page: 'Contact' }
   ];
+  const languageOptions = ['EN', 'HI', 'MR'];
 
   return (
     <nav className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-lg sticky top-0 z-30 shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center h-16">
+      <div className="mx-auto max-w-[1400px] px-3 sm:px-4 lg:px-8">
+        <div className="flex flex-wrap items-center py-2 md:h-16 md:flex-nowrap md:py-0">
           {/* Hamburger menu */}
           <div className="relative" ref={menuRef}>
             <IconButton
@@ -150,7 +184,7 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-slate-800 ring-1 ring-black ring-opacity-5 z-50"
+                className="absolute left-0 mt-2 w-64 max-w-[85vw] rounded-md shadow-lg bg-white dark:bg-slate-800 ring-1 ring-black ring-opacity-5 z-50"
               >
                 {/* Navigation buttons in dropdown menu */}
                 <div className="py-1" role="menu">
@@ -166,13 +200,41 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                       {link.name}
                     </button>
                   ))}
-                  <div className="border-t border-slate-200 dark:border-slate-700 mt-1 pt-1">
+                  <div className="border-t border-slate-200 dark:border-slate-700 mt-1 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Language</p>
+                    <div className="mt-1 flex items-center gap-1">
+                      {languageOptions.map((code) => (
+                        <button
+                          key={code}
+                          type="button"
+                          onClick={() => applyLanguagePreference(code)}
+                          className={`rounded-md px-2 py-1 text-[11px] font-semibold transition ${((language || 'EN').toUpperCase() === code)
+                            ? 'bg-cyan-600 text-white'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'}`}
+                          aria-label={`Switch language to ${code}`}
+                        >
+                          {code}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="border-t border-slate-200 dark:border-slate-700 mt-1 px-3 py-2 space-y-2">
                     {state.isLoggedIn ? (
                       <>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => { onNavigate('AdminMerchantPanel'); setIsMenuOpen(false); }}
+                            className="block w-full rounded-lg border border-cyan-300 bg-cyan-50 px-3 py-2 text-center text-sm font-semibold text-cyan-700 transition-colors hover:bg-cyan-100 dark:border-cyan-400/40 dark:bg-cyan-500/10 dark:text-cyan-300 dark:hover:bg-cyan-500/20"
+                            role="menuitem"
+                          >
+                            Merchant Verification
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => { onNavigate('Account'); setIsMenuOpen(false); }}
-                          className="block w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                          className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-center text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                           role="menuitem"
                         >
                           Account
@@ -180,7 +242,7 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                         <button
                           type="button"
                           onClick={handleLogout}
-                          className="block w-full text-left px-4 py-2 text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                          className="block w-full rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-center text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-400/40 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:bg-rose-500/20"
                           role="menuitem"
                         >
                           Logout
@@ -191,7 +253,7 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                         <button
                           type="button"
                           onClick={() => { onNavigate('Login'); setIsMenuOpen(false); }}
-                          className="block w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                          className="block w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-center text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-50 dark:border-amber-400/40 dark:bg-slate-900 dark:text-amber-300 dark:hover:bg-amber-500/10"
                           role="menuitem"
                         >
                           {t('login')}
@@ -199,7 +261,7 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                         <button
                           type="button"
                           onClick={() => { onNavigate('Signup'); setIsMenuOpen(false); }}
-                          className="block w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                          className="block w-full rounded-lg border border-amber-500 bg-amber-400 px-3 py-2 text-center text-sm font-semibold text-slate-900 transition-colors hover:bg-amber-500"
                           role="menuitem"
                         >
                           {t('signup')}
@@ -213,7 +275,7 @@ const Navbar = ({ onCartClick, onNavigate }) => {
           </div>
 
           {/* Brand logo with both icon and text */}
-          <div className="flex-shrink-0 ml-4">
+          <div className="flex-shrink-0 ml-2 sm:ml-4">
             <button
               type="button"
               onClick={() => onNavigate('Home')}
@@ -223,7 +285,7 @@ const Navbar = ({ onCartClick, onNavigate }) => {
               title="Home"
             >
               <span className="inline-flex items-center justify-center rounded-full bg-white dark:bg-slate-900 border-2 border-indigo-500 dark:border-indigo-400 mr-3"
-                    style={{ width: 48, height: 48, overflow: 'hidden' }}>
+                    style={{ width: 44, height: 44, overflow: 'hidden' }}>
                 <img
                   src="/MyCollegeMart-Icon.jpg"
                   alt="MyCollegeMart Icon"
@@ -231,22 +293,22 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                 />
               </span>
               {/* Neutral brand wordmark (no dot, no blue) */}
-              <span className="brand-wordmark text-[22px] md:text-[26px] font-semibold tracking-tight text-slate-900 dark:text-white">
+              <span className="brand-wordmark hidden text-[22px] font-semibold tracking-tight text-slate-900 dark:text-white sm:inline md:text-[26px]">
                 MyCollegeMart
               </span>
             </button>
           </div>
 
           {/* Expanded search bar */}
-          <div className="flex-1 mx-4 md:mx-6 lg:mx-8">
-            <form onSubmit={handleSearchSubmit} className="relative flex items-center">
+          <div className="order-3 mt-2 w-full md:order-none md:mt-0 md:mx-4 md:min-w-[340px] md:flex-[1.7] lg:mx-6 lg:flex-[2.15]">
+            <form onSubmit={handleSearchSubmit} className="relative flex items-center gap-2">
               <div className="relative flex-grow">
                 <input
                   type="text"
                   placeholder={t('search_placeholder')}
                   value={searchTerm}
                   onChange={handleSearchChange}
-                  className="w-full pl-10 pr-12 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all duration-200 hover:border-indigo-300 dark:hover:border-indigo-500"
+                  className="w-full pl-10 pr-12 py-2.5 md:py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all duration-200 hover:border-indigo-300 dark:hover:border-indigo-500"
                 />
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <SearchIcon />
@@ -273,10 +335,11 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 type="submit"
-                className="ml-2 px-5 py-3 bg-amber-400 hover:bg-amber-500 text-slate-900 font-normal rounded-lg shadow-sm"
+                className="px-3 py-2.5 md:px-5 md:py-3 bg-amber-400 hover:bg-amber-500 text-slate-900 font-normal rounded-lg shadow-sm"
                 disabled={!searchTerm.trim()}
               >
-                Search
+                <span className="hidden sm:inline">Search</span>
+                <span className="sm:hidden">Go</span>
               </motion.button>
 
               {suggestions.length > 0 && (
@@ -297,59 +360,124 @@ const Navbar = ({ onCartClick, onNavigate }) => {
           </div>
 
           {/* Right side icons */}
-          <div className="flex items-center space-x-1 md:space-x-2">
-            <IconButton
-              onClick={handleAccountClick}
-              title={state.isLoggedIn ? 'Account' : 'Login'}
-              aria={state.isLoggedIn ? 'Account' : 'Login'}
-            >
-              <UserCircleIcon />
-            </IconButton>
+          <div className="ml-auto flex items-center gap-1.5 md:flex-shrink-0 md:gap-2">
+            <div className="hidden md:flex items-center gap-0.5 rounded-2xl border border-slate-200/80 bg-white/85 px-1.5 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/75">
+              <label htmlFor="mcm-language-select" className="sr-only">Language</label>
+              <select
+                id="mcm-language-select"
+                value={(language || 'en').toUpperCase()}
+                onChange={handleLanguageChange}
+                className="h-8 rounded-lg border border-slate-200 bg-slate-50 px-2 text-[11px] font-bold tracking-wide text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                title="Language"
+              >
+                <option value="EN">EN</option>
+                <option value="HI">HI</option>
+                <option value="MR">MR</option>
+              </select>
 
-            <IconButton
-              onClick={toggleTheme}
-              title={theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-              aria="Toggle theme"
-              active={false}
-            >
-              {theme === 'light' ? <MoonIcon /> : <SunIcon />}
-            </IconButton>
+              {!state.isLoggedIn && (
+                <IconButton
+                  onClick={handleAccountClick}
+                  title="Login"
+                  aria="Login"
+                >
+                  <UserCircleIcon />
+                </IconButton>
+              )}
 
-            <IconButton
-              onClick={() => onNavigate('Wishlist')}
-              title="Wishlist"
-              aria="Wishlist"
-              active={state.wishlist.length > 0}
-            >
-              <HeartIcon filled={state.wishlist.length > 0} />
-            </IconButton>
-
-            <div className="relative">
-              <IconButton onClick={onCartClick} title="Cart" aria="Cart" active={false}>
-                <span className="relative">
-                  <ShoppingCartIcon />
-                  {cartItemCount > 0 && (
-                    <span className="absolute -top-2 -right-2 flex h-5 min-w-5 px-1 items-center justify-center rounded-full bg-red-500 text-[11px] text-white shadow-md ring-2 ring-white dark:ring-slate-900">
-                      {cartItemCount}
-                    </span>
-                  )}
-                </span>
+              <IconButton
+                onClick={toggleTheme}
+                title={theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+                aria="Toggle theme"
+                active={false}
+              >
+                {theme === 'light' ? <MoonIcon /> : <SunIcon />}
               </IconButton>
+
+              <IconButton
+                onClick={() => onNavigate('Wishlist')}
+                title="Wishlist"
+                aria="Wishlist"
+                active={state.wishlist.length > 0}
+              >
+                <HeartIcon filled={state.wishlist.length > 0} />
+              </IconButton>
+
+              <div className="relative">
+                <IconButton onClick={onCartClick} title="Cart" aria="Cart" active={false}>
+                  <span className="relative">
+                    <ShoppingCartIcon />
+                    {cartItemCount > 0 && (
+                      <span className="absolute -top-2 -right-2 flex h-5 min-w-5 px-1 items-center justify-center rounded-full bg-red-500 text-[11px] text-white shadow-md ring-2 ring-white dark:ring-slate-900">
+                        {cartItemCount}
+                      </span>
+                    )}
+                  </span>
+                </IconButton>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-0.5 md:hidden">
+              <IconButton
+                onClick={handleAccountClick}
+                title={state.isLoggedIn ? 'Account' : 'Login'}
+                aria={state.isLoggedIn ? 'Account' : 'Login'}
+              >
+                <UserCircleIcon />
+              </IconButton>
+
+              <IconButton
+                onClick={toggleTheme}
+                title={theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+                aria="Toggle theme"
+              >
+                {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+              </IconButton>
+
+              <IconButton
+                onClick={() => onNavigate('Wishlist')}
+                title="Wishlist"
+                aria="Wishlist"
+                active={state.wishlist.length > 0}
+              >
+                <HeartIcon filled={state.wishlist.length > 0} />
+              </IconButton>
+
+              <div className="relative">
+                <IconButton onClick={onCartClick} title="Cart" aria="Cart" active={false}>
+                  <span className="relative">
+                    <ShoppingCartIcon />
+                    {cartItemCount > 0 && (
+                      <span className="absolute -top-2 -right-2 flex h-5 min-w-5 px-1 items-center justify-center rounded-full bg-red-500 text-[11px] text-white shadow-md ring-2 ring-white dark:ring-slate-900">
+                        {cartItemCount}
+                      </span>
+                    )}
+                  </span>
+                </IconButton>
+              </div>
             </div>
 
             {/* Auth buttons */}
-            <div className="hidden md:flex items-center ml-2">
+            <div className="hidden md:flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/85 px-2 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/75">
               {state.isLoggedIn ? (
                 <>
+                  {isAdmin && (
+                    <button
+                      onClick={() => onNavigate('AdminMerchantPanel')}
+                      className="rounded-xl border border-cyan-300 bg-cyan-50 px-3.5 py-2 text-sm font-semibold text-cyan-700 transition-colors hover:bg-cyan-100 dark:border-cyan-400/40 dark:bg-cyan-500/10 dark:text-cyan-300 dark:hover:bg-cyan-500/20"
+                    >
+                      Admin
+                    </button>
+                  )}
                   <button
                     onClick={() => onNavigate('Account')}
-                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-semibold transition-colors"
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     Account
                   </button>
                   <button
                     onClick={handleLogout}
-                    className="ml-2 px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-md text-sm font-semibold transition-colors"
+                    className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-400/40 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:bg-rose-500/20"
                   >
                     Logout
                   </button>
@@ -358,13 +486,13 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                 <>
                   <button
                     onClick={() => onNavigate('Login')}
-                    className="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-slate-900 rounded-md text-sm font-semibold transition-colors"
+                    className="rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-50 dark:border-amber-400/40 dark:bg-slate-900 dark:text-amber-300 dark:hover:bg-amber-500/10"
                   >
                     {t('login')}
                   </button>
                   <button
                     onClick={() => onNavigate('Signup')}
-                    className="ml-2 px-4 py-2 bg-amber-400 hover:bg-amber-500 text-slate-900 rounded-md text-sm font-semibold transition-colors"
+                    className="rounded-xl border border-amber-500 bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-amber-500"
                   >
                     {t('signup')}
                   </button>

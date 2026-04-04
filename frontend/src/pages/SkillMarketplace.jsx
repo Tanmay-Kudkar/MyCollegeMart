@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { AcademicCapIcon } from '../components/UI/Icons';
 import { ENGINEERING_BRANCHES } from '../utils/constants';
 import { skills } from '../utils/api';
+import { useGlobalState, actionTypes } from '../context/GlobalStateContext';
 
 const SKILL_SERVICES = [
   {
@@ -62,6 +63,9 @@ const SKILL_SERVICES = [
 ];
 
 const FILTER_SELECT_STYLE = 'w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200';
+const CREATE_INPUT_STYLE = 'mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200';
+const SKILL_TYPES = ['Assignment', 'Practical', 'Tutoring', 'Project'];
+const SKILL_SEMESTERS = ['All', 1, 2, 3, 4, 5, 6, 7, 8];
 
 const TYPE_STYLES = {
   Assignment: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
@@ -70,46 +74,66 @@ const TYPE_STYLES = {
   Project: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
 };
 
-const ServiceCard = ({ service, onSelect }) => (
+const SKILL_FALLBACK_IMAGES = [
+  'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?auto=format&fit=crop&w=900&q=80',
+  'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=900&q=80',
+  'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=900&q=80',
+  'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=900&q=80',
+  'https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&w=900&q=80',
+  'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=900&q=80',
+];
+
+const getServiceImage = (service, index) => {
+  if (service?.imageUrl) {
+    return service.imageUrl;
+  }
+
+  const fallbackIndex = Number.isFinite(index) ? index % SKILL_FALLBACK_IMAGES.length : 0;
+  return SKILL_FALLBACK_IMAGES[fallbackIndex];
+};
+
+const buildInitialCreateForm = () => ({
+  title: '',
+  type: 'Assignment',
+  description: '',
+  price: '',
+  branch: 'All Branches',
+  semester: 'All',
+  images: [],
+  videos: [],
+});
+
+const ServiceCard = ({ service, onSelect, index }) => (
   <motion.div
-    whileHover={{ y: -4 }}
-    className="group cursor-pointer overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
-    onClick={() => onSelect(service)}
+    className="group h-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
   >
     <div className="relative">
-      {service.imageUrl ? (
-        <img
-          src={service.imageUrl}
-          alt={service.title}
-          className="h-40 w-full object-cover transition-transform duration-300 group-hover:scale-105"
-        />
-      ) : (
-        <div className="h-40 w-full bg-gradient-to-br from-cyan-600 via-indigo-700 to-slate-900" />
-      )}
+      <img
+        src={getServiceImage(service, index)}
+        alt={service.title}
+        className="h-40 w-full object-cover transition-transform duration-300 group-hover:scale-105"
+      />
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
       <span className={`absolute left-3 top-3 rounded-full px-2 py-1 text-[11px] font-semibold ${TYPE_STYLES[service.type] || 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'}`}>
         {service.type}
       </span>
     </div>
 
-    <div className="p-5">
+    <div className="flex h-[260px] flex-col p-5">
       <h3 className="line-clamp-2 text-xl font-bold text-slate-900 dark:text-white">{service.title}</h3>
-      <p className="mt-2 line-clamp-3 text-sm text-slate-600 dark:text-slate-400">{service.description}</p>
+      <p className="mt-2 min-h-[72px] line-clamp-3 text-sm text-slate-600 dark:text-slate-400">{service.description}</p>
 
-      <div className="mt-5 flex items-center justify-between">
+      <div className="mt-auto flex items-start justify-between gap-2">
         <span className="text-xl font-extrabold text-cyan-700 dark:text-cyan-400">₹{service.price}</span>
-        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex max-w-[65%] items-start gap-1.5 text-right text-xs text-slate-500 dark:text-slate-400">
           <AcademicCapIcon className="w-4 h-4" />
-          <span>{service.branch} - Sem {service.semester}</span>
+          <span className="line-clamp-2">{service.branch} - Sem {service.semester}</span>
         </div>
       </div>
 
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelect(service);
-        }}
+        onClick={() => onSelect(service)}
         className="mt-4 w-full rounded-lg border border-cyan-600/40 bg-cyan-50 px-4 py-2 text-sm font-semibold text-cyan-700 transition hover:bg-cyan-100 dark:border-cyan-500/40 dark:bg-cyan-900/20 dark:text-cyan-300 dark:hover:bg-cyan-900/30"
       >
         Request Help
@@ -154,14 +178,20 @@ const Filters = ({ onFilterChange, currentFilters }) => {
 };
 
 const SkillMarketplace = ({ onNavigate }) => {
+  const { state, dispatch } = useGlobalState();
   const [services, setServices] = useState([]);
   const [status, setStatus] = useState('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [showCreatePanel, setShowCreatePanel] = useState(false);
+  const [isCreatingService, setIsCreatingService] = useState(false);
+  const [createForm, setCreateForm] = useState(buildInitialCreateForm());
   const [filters, setFilters] = useState({
     type: 'All',
     branch: 'All Branches',
     semester: 'All',
   });
+
+  const isMaster = Boolean(state.user?.isMaster);
 
   useEffect(() => {
     setStatus('loading');
@@ -184,6 +214,106 @@ const SkillMarketplace = ({ onNavigate }) => {
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleCreateFieldChange = (field, value) => {
+    setCreateForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const resetCreateForm = () => {
+    setCreateForm(buildInitialCreateForm());
+  };
+
+  const handleCreateService = async (event) => {
+    event.preventDefault();
+
+    if (!state.isLoggedIn) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Please sign in with Master portal first.', type: 'error' },
+      });
+      onNavigate?.('Login', { accountType: 'MASTER' });
+      return;
+    }
+
+    if (!isMaster) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Only Master login can add new services.', type: 'error' },
+      });
+      return;
+    }
+
+    if (!createForm.title.trim() || createForm.title.trim().length < 3) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Service title must be at least 3 characters.', type: 'error' },
+      });
+      return;
+    }
+
+    if (!createForm.description.trim() || createForm.description.trim().length < 15) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Description should be at least 15 characters.', type: 'error' },
+      });
+      return;
+    }
+
+    const parsedPrice = Number(createForm.price);
+    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Please enter a valid service price.', type: 'error' },
+      });
+      return;
+    }
+
+    setIsCreatingService(true);
+    try {
+      const formData = new FormData();
+      formData.append('title', createForm.title.trim());
+      formData.append('type', createForm.type);
+      formData.append('description', createForm.description.trim());
+      formData.append('price', String(parsedPrice));
+      formData.append('branch', createForm.branch);
+      formData.append('semester', String(createForm.semester));
+
+      createForm.images.forEach((file) => {
+        formData.append('images', file);
+      });
+
+      createForm.videos.forEach((file) => {
+        formData.append('videos', file);
+      });
+
+      const response = await skills.create(formData);
+      const created = response?.data;
+      if (created) {
+        setServices((prev) => [created, ...prev]);
+      }
+
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'New skill service added successfully.', type: 'success' },
+      });
+
+      resetCreateForm();
+      setShowCreatePanel(false);
+    } catch (error) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: {
+          message: error?.message || 'Failed to add service. Please try again.',
+          type: 'error',
+        },
+      });
+    } finally {
+      setIsCreatingService(false);
+    }
   };
 
   const filteredServices = useMemo(() => {
@@ -223,8 +353,155 @@ const SkillMarketplace = ({ onNavigate }) => {
               <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-semibold text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300">
                 {activeBranchCount} branches covered
               </span>
+              {isMaster && (
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePanel((prev) => !prev)}
+                  className="rounded-full border border-cyan-600/40 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700 transition hover:bg-cyan-100 dark:border-cyan-500/40 dark:bg-cyan-900/20 dark:text-cyan-300 dark:hover:bg-cyan-900/30"
+                >
+                  {showCreatePanel ? 'Close Add Service' : 'Add New Service'}
+                </button>
+              )}
             </div>
           </section>
+
+        {isMaster && showCreatePanel && (
+          <section className="rounded-[24px] border border-cyan-200 bg-cyan-50/50 p-5 shadow-sm dark:border-cyan-800/40 dark:bg-cyan-900/10 sm:p-6">
+            <h2 className="mcm-display text-2xl font-bold text-slate-900 dark:text-white">Master Service Creator</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Publish a new service card that students can immediately request.</p>
+
+            <form className="mt-4 space-y-4" onSubmit={handleCreateService}>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Service Title</label>
+                  <input
+                    type="text"
+                    value={createForm.title}
+                    onChange={(e) => handleCreateFieldChange('title', e.target.value)}
+                    className={CREATE_INPUT_STYLE}
+                    placeholder="AI/ML Assignment Debug Session"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Service Type</label>
+                  <select
+                    value={createForm.type}
+                    onChange={(e) => handleCreateFieldChange('type', e.target.value)}
+                    className={CREATE_INPUT_STYLE}
+                  >
+                    {SKILL_TYPES.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Description</label>
+                <textarea
+                  rows={3}
+                  value={createForm.description}
+                  onChange={(e) => handleCreateFieldChange('description', e.target.value)}
+                  className={CREATE_INPUT_STYLE}
+                  placeholder="Explain what support this service provides."
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Price (INR)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={createForm.price}
+                    onChange={(e) => handleCreateFieldChange('price', e.target.value)}
+                    className={CREATE_INPUT_STYLE}
+                    placeholder="199"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Branch</label>
+                  <select
+                    value={createForm.branch}
+                    onChange={(e) => handleCreateFieldChange('branch', e.target.value)}
+                    className={CREATE_INPUT_STYLE}
+                  >
+                    {ENGINEERING_BRANCHES.map((branch) => (
+                      <option key={branch} value={branch}>{branch}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Semester</label>
+                  <select
+                    value={createForm.semester}
+                    onChange={(e) => handleCreateFieldChange('semester', e.target.value)}
+                    className={CREATE_INPUT_STYLE}
+                  >
+                    {SKILL_SEMESTERS.map((semester) => (
+                      <option key={semester} value={semester}>
+                        {semester === 'All' ? 'All Semesters' : `Semester ${semester}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Images (optional)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => handleCreateFieldChange('images', Array.from(e.target.files || []))}
+                    className={`${CREATE_INPUT_STYLE} file:mr-3 file:rounded-md file:border-0 file:bg-cyan-100 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-cyan-700 dark:file:bg-cyan-900/30 dark:file:text-cyan-300`}
+                  />
+                  {createForm.images.length > 0 && (
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{createForm.images.length} image(s) selected</p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Videos (optional)</label>
+                  <input
+                    type="file"
+                    accept="video/*"
+                    multiple
+                    onChange={(e) => handleCreateFieldChange('videos', Array.from(e.target.files || []))}
+                    className={`${CREATE_INPUT_STYLE} file:mr-3 file:rounded-md file:border-0 file:bg-indigo-100 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-indigo-700 dark:file:bg-indigo-900/30 dark:file:text-indigo-300`}
+                  />
+                  {createForm.videos.length > 0 && (
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{createForm.videos.length} video(s) selected</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  disabled={isCreatingService}
+                  className="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-800 disabled:opacity-60"
+                >
+                  {isCreatingService ? 'Publishing...' : 'Publish Service'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetCreateForm();
+                    setShowCreatePanel(false);
+                  }}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </section>
+        )}
 
         {errorMessage && (
           <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 dark:border-amber-700/50 dark:bg-amber-900/20 dark:text-amber-300">
@@ -242,9 +519,9 @@ const SkillMarketplace = ({ onNavigate }) => {
           filteredServices.length > 0 ? (
             <section className="rounded-[24px] border border-slate-200/80 bg-white/95 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800/95 sm:p-6">
               <h2 className="mcm-display mb-4 text-2xl font-bold text-slate-900 dark:text-white">Available Services</h2>
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-              {filteredServices.map(service => (
-                <ServiceCard key={service.id} service={service} onSelect={() => onNavigate?.('AssignmentHelp', { service })} />
+              <div className="grid auto-rows-fr grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
+              {filteredServices.map((service, index) => (
+                <ServiceCard key={service.id} service={service} index={index} onSelect={() => onNavigate?.('AssignmentHelp', { service })} />
               ))}
               </div>
             </section>

@@ -38,7 +38,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping({ "/api/auth", "/auth" })
 public class AuthController {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
@@ -69,12 +69,8 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody AuthRequest request) {
         try {
-            User user = userService.registerWithPassword(request.email(), request.password());
-            Map<String, Object> response = new HashMap<>();
-            response.put("id", user.getId());
-            response.put("email", user.getEmail());
-            response.put("displayName", user.getDisplayName());
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            User user = userService.registerWithPassword(request.email(), request.password(), request.accountType());
+            return ResponseEntity.status(HttpStatus.CREATED).body(buildUserResponse(user));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", e.getMessage()));
         } catch (IllegalArgumentException e) {
@@ -95,6 +91,30 @@ public class AuthController {
                         .body(Map.of("message", "Invalid email or password"));
             }
 
+            if (request.accountType() != null && !request.accountType().isBlank()) {
+                String requestedPortal = request.accountType().trim().toUpperCase();
+                if ("MASTER".equals(requestedPortal)) {
+                    if (!userService.isMaster(user)) {
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                .body(Map.of("message", "Master access is required for this portal."));
+                    }
+                } else if (!userService.isMaster(user)) {
+                    String requestedType = userService.normalizeAccountType(request.accountType());
+                    String userType = userService.normalizeAccountType(user.getAccountType());
+                    if (!requestedType.equals(userType)) {
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                .body(Map.of("message", "This account is not registered for the selected portal."));
+                    }
+                }
+
+                if (!"MASTER".equals(requestedPortal)
+                        && !"MERCHANT".equals(requestedPortal)
+                        && !"INDIVIDUAL".equals(requestedPortal)) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                            .body(Map.of("message", "Unsupported portal selection."));
+                }
+            }
+
             String token = jwtUtil.generateToken(user.getId(), user.getEmail());
             return ResponseEntity.ok(Map.of("token", token));
         } catch (Exception e) {
@@ -105,7 +125,10 @@ public class AuthController {
     }
 
     @GetMapping("/google/start")
-    public void startGoogleOAuth(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    public void startGoogleOAuth(
+            @RequestParam(name = "accountType", required = false) String accountType,
+            HttpServletRequest request,
+            HttpServletResponse response) throws IOException {
         if (!isGoogleConfiguredForOAuthCodeFlow()) {
             logger.error("Google OAuth code flow is not configured on backend");
             redirectWithError(response, "google_oauth_not_configured");
@@ -113,12 +136,14 @@ public class AuthController {
         }
 
         String redirectUri = resolveGoogleRedirectUri(request);
+        String normalizedAccountType = userService.normalizeAccountType(accountType);
 
         String authUrl = "https://accounts.google.com/o/oauth2/v2/auth"
                 + "?client_id=" + encode(googleClientId)
                 + "&redirect_uri=" + encode(redirectUri)
                 + "&response_type=code"
                 + "&scope=" + encode("openid email profile")
+                + "&state=" + encode(normalizedAccountType)
                 + "&prompt=select_account";
 
         response.sendRedirect(authUrl);
@@ -128,6 +153,7 @@ public class AuthController {
     public void handleGoogleOAuthCallback(
             @RequestParam(name = "code", required = false) String code,
             @RequestParam(name = "error", required = false) String error,
+            @RequestParam(name = "state", required = false) String state,
             HttpServletRequest request,
             HttpServletResponse response) throws IOException {
         if (error != null && !error.isBlank()) {
@@ -173,7 +199,7 @@ public class AuthController {
             String name = (String) payload.get("name");
             String googleId = payload.getSubject();
 
-            User user = userService.findOrCreateGoogleUser(email, name, googleId);
+            User user = userService.findOrCreateGoogleUser(email, name, googleId, state);
             String jwt = jwtUtil.generateToken(user.getId(), user.getEmail());
 
             response.sendRedirect(frontendBaseUrl + "/#token=" + encode(jwt));
@@ -187,13 +213,7 @@ public class AuthController {
     public ResponseEntity<?> getCurrentUser(
             @RequestHeader(name = "Authorization", required = false) String authHeader) {
         try {
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token");
-            }
-
-            String token = authHeader.substring(7);
-            String userId = jwtUtil.validateAndGetUserId(token);
-
+            Long userId = resolveUserId(authHeader);
             if (userId == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid JWT");
             }
@@ -203,18 +223,70 @@ public class AuthController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
             }
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("id", user.getId());
-            response.put("email", user.getEmail());
-            response.put("displayName", user.getDisplayName());
-            response.put("isPrimeMember", user.isPrimeMember());
-            response.put("primeExpiryDate", user.getPrimeExpiryDate());
-            response.put("wishlistProductIds", user.getWishlistProductIds());
-
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(buildUserResponse(user));
         } catch (Exception e) {
             logger.error("Failed to fetch user. Cause: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to fetch user");
+        }
+    }
+
+    @PostMapping("/account-type")
+    public ResponseEntity<?> updateAccountType(
+            @RequestHeader(name = "Authorization", required = false) String authHeader,
+            @Valid @RequestBody AccountTypeRequest request) {
+        Long userId = resolveUserId(authHeader);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Please sign in"));
+        }
+
+        try {
+            User updatedUser = userService.updateAccountType(userId, request.accountType());
+            return ResponseEntity.ok(buildUserResponse(updatedUser));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/merchant-profile")
+    public ResponseEntity<?> updateMerchantProfile(
+            @RequestHeader(name = "Authorization", required = false) String authHeader,
+            @Valid @RequestBody MerchantProfileRequest request) {
+        Long userId = resolveUserId(authHeader);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Please sign in"));
+        }
+
+        try {
+            User updatedUser = userService.updateMerchantProfile(
+                    userId,
+                    request.shopName(),
+                    request.shopTagline(),
+                    request.shopDescription(),
+                    request.shopPhone(),
+                    request.shopCampusLocation());
+            return ResponseEntity.ok(buildUserResponse(updatedUser));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    private Long resolveUserId(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return null;
+        }
+
+        String token = authHeader.substring(7);
+        String userId = jwtUtil.validateAndGetUserId(token);
+        if (userId == null) {
+            return null;
+        }
+
+        try {
+            return Long.parseLong(userId);
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 
@@ -240,8 +312,15 @@ public class AuthController {
             return googleRedirectUri.trim();
         }
 
+        String requestPath = request.getRequestURI();
+        String callbackPath = "/api/auth/google/callback";
+        if (requestPath != null && requestPath.endsWith("/google/start")) {
+            callbackPath = requestPath.substring(0, requestPath.length() - "/google/start".length())
+                    + "/google/callback";
+        }
+
         return ServletUriComponentsBuilder.fromRequestUri(request)
-                .replacePath("/api/auth/google/callback")
+                .replacePath(callbackPath)
                 .replaceQuery(null)
                 .build()
                 .toUriString();
@@ -268,8 +347,43 @@ public class AuthController {
         response.sendRedirect(frontendBaseUrl + "/#authError=" + encode(errorCode));
     }
 
+    private Map<String, Object> buildUserResponse(User user) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", user.getId());
+        response.put("email", user.getEmail());
+        response.put("displayName", user.getDisplayName());
+        response.put("isPrimeMember", user.isPrimeMember());
+        response.put("primeExpiryDate", user.getPrimeExpiryDate());
+        response.put("accountType", user.getAccountType());
+        response.put("merchantVerificationStatus",
+                userService.normalizeMerchantVerificationStatus(user.getMerchantVerificationStatus()));
+        response.put("canManageListings", userService.canManageListings(user));
+        response.put("isAdmin", userService.isAdmin(user));
+        response.put("isMaster", userService.isMaster(user));
+        response.put("shopName", user.getShopName());
+        response.put("shopTagline", user.getShopTagline());
+        response.put("shopDescription", user.getShopDescription());
+        response.put("shopPhone", user.getShopPhone());
+        response.put("shopCampusLocation", user.getShopCampusLocation());
+        response.put("wishlistProductIds", user.getWishlistProductIds());
+        return response;
+    }
+
     private record AuthRequest(
             @NotBlank(message = "Email is required") @Email(message = "Please enter a valid email") String email,
-            @NotBlank(message = "Password is required") String password) {
+            @NotBlank(message = "Password is required") String password,
+            String accountType) {
+    }
+
+    private record AccountTypeRequest(
+            @NotBlank(message = "accountType is required") String accountType) {
+    }
+
+    private record MerchantProfileRequest(
+            @NotBlank(message = "shopName is required") String shopName,
+            String shopTagline,
+            String shopDescription,
+            String shopPhone,
+            @NotBlank(message = "shopCampusLocation is required") String shopCampusLocation) {
     }
 }

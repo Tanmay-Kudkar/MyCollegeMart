@@ -9,6 +9,19 @@
   --mcm-font-display: 'Sora', 'Manrope', 'Segoe UI', sans-serif;
 }
 
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+img,
+video {
+  max-width: 100%;
+}
+
 /* Base styles */
 body {
   @apply text-slate-900 transition-colors duration-200;
@@ -34,4 +47,18 @@ body {
 .mcm-display {
   font-family: var(--mcm-font-display);
   letter-spacing: -0.02em;
+}
+
+/* Keep Google website translation engine invisible to preserve app UI. */
+.skiptranslate,
+#goog-gt-tt,
+.goog-te-banner-frame.skiptranslate,
+.goog-tooltip,
+.goog-tooltip:hover,
+.goog-text-highlight {
+  display: none !important;
+}
+
+body {
+  top: 0 !important;
 }

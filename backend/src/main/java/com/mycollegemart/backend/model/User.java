@@ -31,6 +31,27 @@ public class User {
 
     private String primeExpiryDate;
 
+    @Column(name = "account_type", nullable = false, length = 32)
+    private String accountType = "INDIVIDUAL";
+
+    @Column(name = "merchant_verification_status", nullable = false, length = 32)
+    private String merchantVerificationStatus = "NOT_REQUIRED";
+
+    @Column(name = "shop_name")
+    private String shopName;
+
+    @Column(name = "shop_tagline", length = 255)
+    private String shopTagline;
+
+    @Column(name = "shop_description", columnDefinition = "TEXT")
+    private String shopDescription;
+
+    @Column(name = "shop_phone", length = 32)
+    private String shopPhone;
+
+    @Column(name = "shop_campus_location", length = 255)
+    private String shopCampusLocation;
+
     // ✅ ADDED: A new field to store the unique Google User ID.
     // This is a more reliable identifier than email.
     @Column(name = "google_id")

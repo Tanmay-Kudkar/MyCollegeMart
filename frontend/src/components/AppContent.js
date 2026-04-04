@@ -11,7 +11,9 @@ import About from '../pages/Info/About';
 import Contact from '../pages/Info/Contact';
 import Wishlist from '../pages/User/Wishlist';
 import Account from '../pages/User/Account';
+import Settings from '../pages/User/Settings';
 import Sell from '../pages/User/Sell';
+import AdminMerchantPanel from '../pages/User/AdminMerchantPanel';
 import Checkout from '../pages/Checkout';
 import SellerDashboard from '../pages/User/SellerDashboard';
 import PrimeMembership from '../pages/Info/PrimeMembership';
@@ -26,11 +28,96 @@ import Terms from '../pages/Info/Terms';
 import SkillMarketplace from '../pages/SkillMarketplace';
 import AIChatbot from './common/AIChatbot';
 import AssignmentHelp from '../pages/services/AssignmentHelp';
+import AssignmentCheckout from '../pages/services/AssignmentCheckout';
 import { useGlobalState, actionTypes } from '../context/GlobalStateContext';
-import { auth, cart as cartApi, products as productsApi, wishlist as wishlistApi } from '../utils/api';
+import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from '../context/LanguageContext';
+import { auth, cart as cartApi, products as productsApi, settings as settingsApi, wishlist as wishlistApi } from '../utils/api';
+
+const OAUTH_RETURN_PAGE_KEY = 'mcm.oauth.returnPage';
+const OAUTH_RETURN_PARAMS_KEY = 'mcm.oauth.returnParams';
+const OAUTH_BACK_GUARD_KEY = 'mcm.oauth.backGuardPending';
+// Supported values: 'auto' | 'premium' | 'minimal'
+const FOOTER_VARIANT = 'auto';
+
+const getSafePageParams = (value) => (value && typeof value === 'object' ? value : {});
+
+const buildAppHistoryState = (page, pageParams = {}, extra = {}) => ({
+  mcmAppPage: true,
+  page: page || 'Home',
+  params: getSafePageParams(pageParams),
+  ...extra,
+});
+
+const getStoredAppState = () => {
+  const page = localStorage.getItem('mcm.currentPage') || 'Home';
+  try {
+    return {
+      page,
+      params: getSafePageParams(JSON.parse(localStorage.getItem('mcm.pageParams') || '{}')),
+    };
+  } catch {
+    return { page, params: {} };
+  }
+};
+
+const replaceHistoryWithStoredAppState = () => {
+  const cleanUrl = window.location.pathname + window.location.search;
+  const stored = getStoredAppState();
+  window.history.replaceState(buildAppHistoryState(stored.page, stored.params), '', cleanUrl);
+};
+
+const getOauthReturnState = () => {
+  const savedPage = localStorage.getItem(OAUTH_RETURN_PAGE_KEY);
+  const safePage = savedPage && !['Login', 'Signup'].includes(savedPage) ? savedPage : 'Home';
+
+  try {
+    const savedParams = JSON.parse(localStorage.getItem(OAUTH_RETURN_PARAMS_KEY) || '{}');
+    return {
+      page: safePage,
+      params: savedParams && typeof savedParams === 'object' ? savedParams : {},
+    };
+  } catch {
+    return {
+      page: safePage,
+      params: {},
+    };
+  }
+};
+
+const clearOauthReturnState = () => {
+  localStorage.removeItem(OAUTH_RETURN_PAGE_KEY);
+  localStorage.removeItem(OAUTH_RETURN_PARAMS_KEY);
+  localStorage.removeItem(OAUTH_BACK_GUARD_KEY);
+};
+
+const setupOauthBackGuard = (page, pageParams = {}) => {
+  const hasPendingGuard = localStorage.getItem(OAUTH_BACK_GUARD_KEY) === '1';
+  if (!hasPendingGuard) {
+    return;
+  }
+
+  const cleanUrl = window.location.pathname + window.location.search;
+  const currentIndex = Number(window.history.state?.mcmAppIndex);
+  const safeIndex = Number.isFinite(currentIndex) ? currentIndex : 0;
+  const appState = buildAppHistoryState(page, pageParams, { mcmAppIndex: safeIndex });
+  window.history.replaceState(appState, '', cleanUrl);
+  window.history.pushState(
+    buildAppHistoryState(page, pageParams, { mcmAppIndex: safeIndex, mcmOauthBackGuard: true }),
+    '',
+    cleanUrl,
+  );
+  localStorage.removeItem(OAUTH_BACK_GUARD_KEY);
+};
 
 const AppContent = () => {
   const { state, dispatch } = useGlobalState();
+  const { theme, setThemePreference } = useTheme();
+  const { setLanguage } = useTranslation();
+
+  const resolvedFooterVariant = FOOTER_VARIANT === 'auto'
+    ? (theme === 'light' ? 'minimal' : 'premium')
+    : FOOTER_VARIANT;
 
   // Persist page + params + selected product
   const [currentPage, setCurrentPage] = useState(() => localStorage.getItem('mcm.currentPage') || 'Home');
@@ -44,6 +131,66 @@ const AppContent = () => {
   });
   // const [pageData, setPageData] = useState(null);
   // const { state } = useGlobalState();
+
+  const applyPageState = (page, pageParams = {}, options = {}) => {
+    const {
+      syncBrowserHistory = false,
+      historyMethod = 'push',
+      scrollToTop = true,
+    } = options;
+
+    const safePage = page || 'Home';
+    const safeParams = getSafePageParams(pageParams);
+
+    setCurrentPage(safePage);
+    setParams(safeParams);
+    localStorage.setItem('mcm.currentPage', safePage);
+    localStorage.setItem('mcm.pageParams', JSON.stringify(safeParams));
+
+    if (safePage === 'ProductDetail') {
+      setSelectedProduct(safeParams || null);
+      localStorage.setItem('mcm.selectedProduct', JSON.stringify(safeParams || null));
+    } else {
+      setSelectedProduct(null);
+      localStorage.removeItem('mcm.selectedProduct');
+    }
+
+    if (syncBrowserHistory) {
+      const cleanUrl = window.location.pathname + window.location.search;
+      const currentIndex = Number(window.history.state?.mcmAppIndex);
+      const safeCurrentIndex = Number.isFinite(currentIndex) ? currentIndex : 0;
+      const nextIndex = historyMethod === 'replace' ? safeCurrentIndex : safeCurrentIndex + 1;
+      const appHistoryState = buildAppHistoryState(safePage, safeParams, { mcmAppIndex: nextIndex });
+      if (historyMethod === 'replace') {
+        window.history.replaceState(appHistoryState, '', cleanUrl);
+      } else {
+        window.history.pushState(appHistoryState, '', cleanUrl);
+      }
+    }
+
+    if (scrollToTop) {
+      window.scrollTo(0, 0);
+    }
+  };
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.length > 1) {
+      return;
+    }
+
+    const cleanUrl = window.location.pathname + window.location.search;
+    const existingState = window.history.state;
+    if (!existingState || existingState.mcmAppPage !== true) {
+      window.history.replaceState(buildAppHistoryState(currentPage, params, { mcmAppIndex: 0 }), '', cleanUrl);
+    } else if (!Number.isFinite(Number(existingState.mcmAppIndex))) {
+      window.history.replaceState(
+        buildAppHistoryState(existingState.page || currentPage, existingState.params || params, { mcmAppIndex: 0 }),
+        '',
+        cleanUrl,
+      );
+    }
+  }, []);
 
   // Handle backend OAuth redirect: /#token=... or /#authError=...
   useEffect(() => {
@@ -117,7 +264,21 @@ const AppContent = () => {
             // Keep local wishlist if backend sync fails.
           });
       });
-  }, [state.isLoggedIn, state.user?.id, dispatch]);
+
+    settingsApi.getMe()
+      .then((response) => {
+        const preferences = response.data?.preferences || {};
+        if (preferences.themeMode) {
+          setThemePreference(preferences.themeMode);
+        }
+        if (preferences.preferredLanguage) {
+          setLanguage(preferences.preferredLanguage);
+        }
+      })
+      .catch(() => {
+        // Keep current theme/language if settings fetch fails.
+      });
+  }, [state.isLoggedIn, state.user?.id, dispatch, setThemePreference, setLanguage]);
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -134,7 +295,8 @@ const AppContent = () => {
         type: actionTypes.ADD_NOTIFICATION,
         payload: { message: 'Google sign-in failed. Please try again.', type: 'error' }
       });
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      clearOauthReturnState();
+      replaceHistoryWithStoredAppState();
       return;
     }
 
@@ -152,81 +314,87 @@ const AppContent = () => {
           type: actionTypes.SET_WISHLIST,
           payload: Array.isArray(userProfile?.wishlistProductIds) ? userProfile.wishlistProductIds : []
         });
-        setCurrentPage('Home');
-        setParams({});
-        localStorage.setItem('mcm.currentPage', 'Home');
-        localStorage.setItem('mcm.pageParams', '{}');
+
+        const oauthReturnState = getOauthReturnState();
+        applyPageState(oauthReturnState.page, oauthReturnState.params, { scrollToTop: false });
+        setupOauthBackGuard(oauthReturnState.page, oauthReturnState.params);
+        clearOauthReturnState();
       })
       .catch(() => {
         localStorage.removeItem('token');
+        clearOauthReturnState();
         dispatch({
           type: actionTypes.ADD_NOTIFICATION,
           payload: { message: 'Google sign-in failed. Please try again.', type: 'error' }
         });
-      })
-      .finally(() => {
-        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        replaceHistoryWithStoredAppState();
       });
   }, [dispatch]);
 
-  const setHistory = (updater) => {
-    try {
-      const prev = JSON.parse(localStorage.getItem('mcm.pageHistory') || '[]');
-      const newHistory = typeof updater === 'function' ? updater(prev) : updater;
-      localStorage.setItem('mcm.pageHistory', JSON.stringify(newHistory));
-    } catch {
-      // ignore
-    }
-  };
+  useEffect(() => {
+    const handleBrowserHistoryNavigation = (event) => {
+      const historyState = event.state;
+      if (!historyState || historyState.mcmAppPage !== true) {
+        return;
+      }
+
+      const nextPage = typeof historyState.page === 'string' ? historyState.page : 'Home';
+      const nextParams = getSafePageParams(historyState.params);
+      applyPageState(nextPage, nextParams);
+
+      if (historyState.mcmOauthBackGuard === true) {
+        const cleanUrl = window.location.pathname + window.location.search;
+        const guardIndex = Number(historyState.mcmAppIndex);
+        const safeGuardIndex = Number.isFinite(guardIndex) ? guardIndex : 0;
+        window.history.replaceState(
+          buildAppHistoryState(nextPage, nextParams, { mcmAppIndex: safeGuardIndex }),
+          '',
+          cleanUrl,
+        );
+      }
+    };
+
+    window.addEventListener('popstate', handleBrowserHistoryNavigation);
+    return () => window.removeEventListener('popstate', handleBrowserHistoryNavigation);
+  }, []);
 
   // Enhanced navigation to track history
   const handleNavigate = (page, pageParams = {}) => {
-    setHistory(prev => {
-      const newHistory = [...prev, { page: currentPage, params }];
-      localStorage.setItem('mcm.pageHistory', JSON.stringify(newHistory));
-      return newHistory;
-    });
-    setCurrentPage(page);
-    setParams(pageParams);
-    localStorage.setItem('mcm.currentPage', page);
-    localStorage.setItem('mcm.pageParams', JSON.stringify(pageParams || {}));
-
-    if (page === 'ProductDetail') {
-      setSelectedProduct(pageParams || null);
-      localStorage.setItem('mcm.selectedProduct', JSON.stringify(pageParams || null));
-    } else {
-      localStorage.removeItem('mcm.selectedProduct');
+    if (window.history.state?.mcmOauthBackGuard === true) {
+      const cleanUrl = window.location.pathname + window.location.search;
+      const currentIndex = Number(window.history.state?.mcmAppIndex);
+      const safeIndex = Number.isFinite(currentIndex) ? currentIndex : 0;
+      window.history.replaceState(buildAppHistoryState(currentPage, params, { mcmAppIndex: safeIndex }), '', cleanUrl);
     }
 
-    window.scrollTo(0, 0);
+    applyPageState(page, pageParams, { syncBrowserHistory: true, historyMethod: 'push' });
   };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.dispatchEvent(new Event('mcm-force-translate'));
+  }, [currentPage, params]);
 
   // Escape key handler for navigation
   useEffect(() => {
     const handleEsc = (e) => {
-      if (e.key === 'Escape') {
-        setHistory(prev => {
-          if (prev.length > 0) {
-            const last = prev[prev.length - 1];
-            setCurrentPage(last.page);
-            setParams(last.params);
-            localStorage.setItem('mcm.currentPage', last.page);
-            localStorage.setItem('mcm.pageParams', JSON.stringify(last.params || {}));
-            // Remove last from history
-            const newHistory = prev.slice(0, -1);
-            localStorage.setItem('mcm.pageHistory', JSON.stringify(newHistory));
-            if (last.page === 'ProductDetail') {
-              setSelectedProduct(last.params || null);
-              localStorage.setItem('mcm.selectedProduct', JSON.stringify(last.params || null));
-            } else {
-              localStorage.removeItem('mcm.selectedProduct');
-            }
-            window.scrollTo(0, 0);
-            return newHistory;
-          }
-          return prev;
-        });
+      if (e.key !== 'Escape') {
+        return;
       }
+
+      const state = window.history.state || {};
+      const currentIndex = Number(state.mcmAppIndex);
+      const safeIndex = Number.isFinite(currentIndex) ? currentIndex : 0;
+      const canGoBackInApp = state.mcmOauthBackGuard === true || safeIndex > 0;
+
+      if (!canGoBackInApp) {
+        return;
+      }
+
+      window.history.back();
     };
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
@@ -241,9 +409,9 @@ const AppContent = () => {
       case 'ProductDetail':
         return <ProductDetail product={selectedProduct} onNavigate={handleNavigate} />;
       case 'Login':
-        return <Login onNavigate={handleNavigate} />;
+        return <Login onNavigate={handleNavigate} defaultAccountType={params.accountType} />;
       case 'Signup':
-        return <Signup onNavigate={handleNavigate} />;
+        return <Signup onNavigate={handleNavigate} defaultAccountType={params.accountType} />;
       case 'About':
         return <About onNavigate={handleNavigate} />;
       case 'Contact':
@@ -252,8 +420,12 @@ const AppContent = () => {
         return <Wishlist onNavigate={handleNavigate} />;
       case 'Account':
         return <Account onNavigate={handleNavigate} />;
+      case 'Settings':
+        return <Settings onNavigate={handleNavigate} />;
       case 'Sell':
-        return <Sell onNavigate={handleNavigate} />;
+        return <Sell onNavigate={handleNavigate} pageParams={params} />;
+      case 'AdminMerchantPanel':
+        return <AdminMerchantPanel onNavigate={handleNavigate} />;
       case 'Checkout':
         return <Checkout onNavigate={handleNavigate} />;
       case 'SellerDashboard':
@@ -280,21 +452,23 @@ const AppContent = () => {
         return <SkillMarketplace onNavigate={handleNavigate} />;
       case 'AssignmentHelp':
         return <AssignmentHelp onNavigate={handleNavigate} selectedService={params.service} />;
+      case 'AssignmentCheckout':
+        return <AssignmentCheckout onNavigate={handleNavigate} checkoutData={params} />;
       default:
         return <Home onNavigate={handleNavigate} />;
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white">
+    <div className="min-h-screen flex flex-col overflow-x-hidden bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white">
       <Navbar onCartClick={() => setIsCartOpen(true)} onNavigate={handleNavigate} />
       
-      <main className="flex-grow container mx-auto px-4 py-8">
+      <main className="flex-grow w-full max-w-7xl mx-auto px-3 py-5 sm:px-4 sm:py-8">
         {renderPage()}
       </main>
       
       <ShoppingCart isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} onNavigate={handleNavigate} />
-      <Footer onNavigate={handleNavigate} />
+      <Footer onNavigate={handleNavigate} variant={resolvedFooterVariant} />
       <AIChatbot isChatOpen={isChatOpen} setIsChatOpen={setIsChatOpen} onNavigate={handleNavigate} />
     </div>
   );

@@ -3,14 +3,39 @@ import { motion } from 'framer-motion';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import { TrashIcon, SparklesIcon, UploadIcon, CloseIcon } from '../../components/UI/Icons';
 import { products } from '../../utils/api';
+import { ENGINEERING_BRANCHES, SEMESTERS, PRODUCT_CATEGORIES } from '../../utils/constants';
 
-const Sell = ({ onNavigate }) => {
+const FALLBACK_SPEC_PLACEHOLDER = { id: 'custom', key: 'Specification', value: 'Value' };
+const MAX_IMAGES = 10;
+const MAX_VIDEOS = 3;
+const MAX_VIDEO_SIZE_MB = 10;
+
+const safeParseJson = (value, fallback) => {
+  if (value == null || value === '') {
+    return fallback;
+  }
+
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return fallback;
+    }
+  }
+
+  return value;
+};
+
+const Sell = ({ onNavigate, pageParams = {} }) => {
   const { state, dispatch } = useGlobalState();
   const [itemName, setItemName] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('Textbooks');
   const [branch, setBranch] = useState('All Branches');
   const [semester, setSemester] = useState('All');
+  const [inStock, setInStock] = useState(true);
+  const [stockQuantity, setStockQuantity] = useState('');
+  const [targetSuggestion, setTargetSuggestion] = useState('');
   const [description, setDescription] = useState('');
   const [imagePreviews, setImagePreviews] = useState([]);
   const [videoPreviews, setVideoPreviews] = useState([]); // New state for video previews
@@ -19,48 +44,38 @@ const Sell = ({ onNavigate }) => {
   // const [specs, setSpecs] = useState([{ key: '', value: '' }]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingEditData, setIsLoadingEditData] = useState(false);
   const [videoError, setVideoError] = useState(''); // Track video upload errors
   const videoInputRef = useRef(null); // Reference to video input element
 
-  // Engineering branches
-  const branches = [
-    'All Branches',
-    'Computer Engineering',
-    'Civil Engineering',
-    'Electronics and Telecommunication Engineering',
-    'Information Technology',
-    'Instrumentation Engineering',
-    'Mechanical Engineering',
-    'Artificial Intelligence and Data Science',
-    'Computer Science and Engineering (Data Science)',
-    'Electronics and Telecommunication Engineering (VLSI)'
-  ];
-  
-  const semesters = ['All', '1', '2', '3', '4', '5', '6', '7', '8'];
-  const categories = [
-    'Textbooks',
-    'Notes',
-    'Lab Equipment',
-    'Electronics',
-    'Calculators',
-    'Drawing Supplies',
-    'Study Guides',
-    'Programming Tools',
-    'Project Materials',
-    'Workshop Equipment',
-    'Technical Devices',
-    'Reference Books',
-    'Stationery'
-  ];
+  const isEditMode = pageParams?.mode === 'edit' && Number.isFinite(Number(pageParams?.productId));
+  const editProductId = isEditMode ? Number(pageParams?.productId) : null;
+
+  const branches = ENGINEERING_BRANCHES;
+  const semesters = SEMESTERS;
+  const categories = PRODUCT_CATEGORIES;
 
   const handleImageChange = (e) => {
-    if (e.target.files) {
-      const filesArray = Array.from(e.target.files).map(file => ({
-        file,
-        url: URL.createObjectURL(file)
-      }));
-      setImagePreviews(prev => prev.concat(filesArray));
+    if (!e.target.files || e.target.files.length === 0) {
+      return;
     }
+
+    const selectedImages = Array.from(e.target.files);
+    if (imagePreviews.length + selectedImages.length > MAX_IMAGES) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: `You can upload up to ${MAX_IMAGES} images.`, type: 'error' }
+      });
+      e.target.value = '';
+      return;
+    }
+
+    const filesArray = selectedImages.map(file => ({
+      file,
+      url: URL.createObjectURL(file)
+    }));
+    setImagePreviews(prev => prev.concat(filesArray));
+    e.target.value = '';
   };
   
   const removeImage = (index) => {
@@ -78,16 +93,25 @@ const Sell = ({ onNavigate }) => {
     if (!e.target.files || e.target.files.length === 0) return;
     
     const newVideos = Array.from(e.target.files);
-    if (videoPreviews.length + newVideos.length > 5) {
-      setVideoError('Maximum 5 videos allowed');
+    if (videoPreviews.length + newVideos.length > MAX_VIDEOS) {
+      const message = `Maximum ${MAX_VIDEOS} videos allowed`;
+      setVideoError(message);
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message, type: 'error' }
+      });
       return;
     }
     
     for (const file of newVideos) {
       // Check file size (rough estimate: 1MB per 10 seconds for medium quality)
-      const MAX_SIZE_MB = 10; // Allowing 10MB which should cover ~1min of video
-      if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-        setVideoError(`Video "${file.name}" exceeds maximum size of ${MAX_SIZE_MB}MB`);
+      if (file.size > MAX_VIDEO_SIZE_MB * 1024 * 1024) {
+        const message = `Video "${file.name}" exceeds maximum size of ${MAX_VIDEO_SIZE_MB}MB`;
+        setVideoError(message);
+        dispatch({
+          type: actionTypes.ADD_NOTIFICATION,
+          payload: { message, type: 'error' }
+        });
         return;
       }
       
@@ -142,6 +166,85 @@ const Sell = ({ onNavigate }) => {
   const [availableOptions, setAvailableOptions] = useState([...allSpecOptions]);
   const [showMaxSpecsWarning, setShowMaxSpecsWarning] = useState(false);
 
+  const clearImagePreviews = () => {
+    setImagePreviews((prev) => {
+      prev.forEach((image) => {
+        if (image?.url) {
+          URL.revokeObjectURL(image.url);
+        }
+      });
+      return [];
+    });
+  };
+
+  const clearVideoPreviews = () => {
+    setVideoPreviews((prev) => {
+      prev.forEach((video) => {
+        if (video?.url) {
+          URL.revokeObjectURL(video.url);
+        }
+      });
+      return [];
+    });
+  };
+
+  const resetFormState = () => {
+    setItemName('');
+    setPrice('');
+    setCategory('Textbooks');
+    setBranch('All Branches');
+    setSemester('All');
+    setInStock(true);
+    setStockQuantity('');
+    setTargetSuggestion('');
+    setDescription('');
+    setVideoUrl('');
+    setHighlights(['', '', '']);
+    setSpecs([]);
+    setAvailableOptions([...allSpecOptions]);
+    setVideoError('');
+    clearImagePreviews();
+    clearVideoPreviews();
+    if (videoInputRef.current) {
+      videoInputRef.current.value = '';
+    }
+  };
+
+  const hydrateSpecsForEdit = (rawSpecs) => {
+    const parsedSpecs = safeParseJson(rawSpecs, {});
+    const specEntries = parsedSpecs && typeof parsedSpecs === 'object' && !Array.isArray(parsedSpecs)
+      ? Object.entries(parsedSpecs)
+      : [];
+
+    const optionByKey = new Map(allSpecOptions.map((option) => [option.key.toLowerCase(), option]));
+    const usedOptionIds = new Set();
+
+    const nextSpecs = specEntries
+      .map(([key, value]) => {
+        const normalizedKey = String(key || '').trim();
+        const normalizedValue = String(value ?? '').trim();
+        if (!normalizedKey || !normalizedValue) {
+          return null;
+        }
+
+        const matchedOption = optionByKey.get(normalizedKey.toLowerCase());
+        if (matchedOption?.id) {
+          usedOptionIds.add(matchedOption.id);
+        }
+
+        return {
+          id: matchedOption?.id || null,
+          key: normalizedKey,
+          value: normalizedValue,
+          placeholder: matchedOption || FALLBACK_SPEC_PLACEHOLDER,
+        };
+      })
+      .filter(Boolean);
+
+    setSpecs(nextSpecs);
+    setAvailableOptions(allSpecOptions.filter((option) => !usedOptionIds.has(option.id)));
+  };
+
   // Track when warning should be shown or hidden
   useEffect(() => {
     if (availableOptions.length === 0) {
@@ -150,6 +253,79 @@ const Sell = ({ onNavigate }) => {
       setShowMaxSpecsWarning(false);
     }
   }, [availableOptions]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    if (!isEditMode || !editProductId || !state.isLoggedIn) {
+      return () => {
+        isCancelled = true;
+      };
+    }
+
+    setIsLoadingEditData(true);
+    products.getById(editProductId)
+      .then((response) => {
+        if (isCancelled) {
+          return;
+        }
+
+        const listing = response?.data;
+        const ownerId = Number(listing?.listedByUserId);
+        const currentUserId = Number(state.user?.id);
+        if (!Number.isFinite(ownerId) || !Number.isFinite(currentUserId) || ownerId !== currentUserId) {
+          throw new Error('You can edit only your own listing.');
+        }
+
+        setItemName(listing?.name || '');
+        setPrice(listing?.price != null ? String(listing.price) : '');
+        setCategory(listing?.category || 'General');
+        setBranch(listing?.branch || 'All Branches');
+        setSemester(listing?.semester || 'All');
+        setInStock(listing?.inStock !== false);
+        setStockQuantity(listing?.stockQuantity == null ? '' : String(listing.stockQuantity));
+        setDescription(listing?.description || '');
+        setVideoUrl(listing?.externalVideoUrl || '');
+        setTargetSuggestion('');
+        setVideoError('');
+
+        const parsedHighlights = safeParseJson(listing?.highlightsJson, []);
+        const normalizedHighlights = Array.isArray(parsedHighlights)
+          ? parsedHighlights.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 3)
+          : [];
+        while (normalizedHighlights.length < 3) {
+          normalizedHighlights.push('');
+        }
+        setHighlights(normalizedHighlights);
+
+        hydrateSpecsForEdit(listing?.specsJson);
+        clearImagePreviews();
+        clearVideoPreviews();
+      })
+      .catch((error) => {
+        if (isCancelled) {
+          return;
+        }
+
+        dispatch({
+          type: actionTypes.ADD_NOTIFICATION,
+          payload: {
+            message: error?.response?.data?.message || error?.message || 'Unable to load listing for editing.',
+            type: 'error',
+          },
+        });
+        onNavigate('SellerDashboard');
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsLoadingEditData(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isEditMode, editProductId, state.isLoggedIn, state.user?.id]);
 
   const addSpecField = () => {
     if (availableOptions.length === 0) {
@@ -197,6 +373,60 @@ const Sell = ({ onNavigate }) => {
     setSpecs(newSpecs);
   };
 
+  const handleSuggestAcademicTarget = () => {
+    const searchText = `${itemName} ${description} ${category}`.toLowerCase();
+    const rules = [
+      {
+        keywords: ['dsa', 'data structure', 'algorithm', 'oop', 'java', 'python', 'dbms', 'operating system', 'computer network'],
+        branch: 'Computer Engineering',
+        semester: '3',
+        reason: 'Looks like a core Computer/IT subject listing, so Sem 3 is a good default.',
+      },
+      {
+        keywords: ['mechanics', 'thermodynamics', 'machine design', 'cad', 'workshop'],
+        branch: 'Mechanical Engineering',
+        semester: '4',
+        reason: 'Matched Mechanical keywords often taught around Sem 3-5.',
+      },
+      {
+        keywords: ['circuit', 'vlsi', 'signal', 'embedded', 'microcontroller', 'electronic'],
+        branch: 'Electronics and Telecommunication Engineering',
+        semester: '4',
+        reason: 'Matched Electronics/ENTC keywords, so Sem 4 is a practical target.',
+      },
+      {
+        keywords: ['survey', 'concrete', 'structure', 'geotech', 'transportation'],
+        branch: 'Civil Engineering',
+        semester: '4',
+        reason: 'Civil-focused keywords detected, mapped to a mid-semester audience.',
+      },
+      {
+        keywords: ['ai', 'machine learning', 'ml', 'deep learning', 'neural network', 'data science'],
+        branch: 'Artificial Intelligence and Data Science',
+        semester: '6',
+        reason: 'AI/ML content usually gets best reach in higher semesters.',
+      },
+    ];
+
+    const matched = rules.find((rule) => rule.keywords.some((keyword) => searchText.includes(keyword)));
+
+    if (matched) {
+      setBranch(matched.branch);
+      setSemester(matched.semester);
+      setTargetSuggestion(`${matched.branch}, Sem ${matched.semester}. ${matched.reason}`);
+      return;
+    }
+
+    if (['Textbooks', 'Notes', 'Study Guides', 'Reference Books'].includes(category)) {
+      setTargetSuggestion('Tip: Choose an exact branch and semester to improve discovery for academic listings.');
+      return;
+    }
+
+    setBranch('All Branches');
+    setSemester('All');
+    setTargetSuggestion('Suggested All Branches / All Semesters for a general campus listing.');
+  };
+
   const handleGenerateDescription = async () => {
     if (!itemName) {
       dispatch({
@@ -216,6 +446,22 @@ const Sell = ({ onNavigate }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!itemName.trim() || itemName.trim().length < 3) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Item name should be at least 3 characters.', type: 'error' }
+      });
+      return;
+    }
+
+    if (!description.trim() || description.trim().length < 15) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Description should be at least 15 characters.', type: 'error' }
+      });
+      return;
+    }
+
     if (!price || Number(price) <= 0) {
       dispatch({
         type: actionTypes.ADD_NOTIFICATION,
@@ -224,10 +470,64 @@ const Sell = ({ onNavigate }) => {
       return;
     }
 
-    if (imagePreviews.length === 0) {
+    if (Number(price) > 500000) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Price is too high for a campus listing.', type: 'error' }
+      });
+      return;
+    }
+
+    if (stockQuantity !== '' && Number(stockQuantity) < 0) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Stock quantity cannot be negative.', type: 'error' }
+      });
+      return;
+    }
+
+    if (inStock && stockQuantity !== '' && Number(stockQuantity) === 0) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Set stock above 0 or mark item as out of stock.', type: 'error' }
+      });
+      return;
+    }
+
+    if (
+      ['Textbooks', 'Notes', 'Study Guides', 'Reference Books'].includes(category)
+      && (branch === 'All Branches' || semester === 'All')
+    ) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: {
+          message: 'For academic listings, select a specific branch and semester (or use Suggest Branch & Semester).',
+          type: 'error'
+        }
+      });
+      return;
+    }
+
+    if (!isEditMode && imagePreviews.length === 0) {
       dispatch({
         type: actionTypes.ADD_NOTIFICATION,
         payload: { message: 'Please upload at least one image.', type: 'error' }
+      });
+      return;
+    }
+
+    if (imagePreviews.length > MAX_IMAGES) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: `You can upload up to ${MAX_IMAGES} images.`, type: 'error' }
+      });
+      return;
+    }
+
+    if (videoPreviews.length > MAX_VIDEOS) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: `You can upload up to ${MAX_VIDEOS} videos.`, type: 'error' }
       });
       return;
     }
@@ -255,6 +555,12 @@ const Sell = ({ onNavigate }) => {
       formData.append('category', category);
       formData.append('branch', branch);
       formData.append('semester', semester);
+      formData.append('inStock', String(inStock));
+      if (!inStock) {
+        formData.append('stockQuantity', '0');
+      } else if (stockQuantity !== '') {
+        formData.append('stockQuantity', String(Number(stockQuantity)));
+      }
       formData.append('highlightsJson', JSON.stringify(highlightsList));
       formData.append('specsJson', JSON.stringify(specsMap));
 
@@ -270,6 +576,24 @@ const Sell = ({ onNavigate }) => {
         formData.append('videos', video.file);
       });
 
+      if (isEditMode && editProductId) {
+        const response = await products.updateListing(editProductId, formData);
+        const updatedProduct = response.data;
+        const currentItems = Array.isArray(state.products?.items) ? state.products.items : [];
+        dispatch({
+          type: actionTypes.FETCH_PRODUCTS_SUCCESS,
+          payload: currentItems.map((item) => (item.id === updatedProduct?.id ? { ...item, ...updatedProduct } : item)),
+        });
+
+        dispatch({
+          type: actionTypes.ADD_NOTIFICATION,
+          payload: { message: 'Listing updated successfully.', type: 'success' }
+        });
+
+        onNavigate('SellerDashboard');
+        return;
+      }
+
       const response = await products.createListing(formData);
       const createdProduct = response.data;
 
@@ -284,27 +608,16 @@ const Sell = ({ onNavigate }) => {
         payload: { message: 'Item listed for sale successfully!', type: 'success' }
       });
 
-      imagePreviews.forEach((image) => URL.revokeObjectURL(image.url));
-      videoPreviews.forEach((video) => URL.revokeObjectURL(video.url));
-
-      setItemName('');
-      setPrice('');
-      setCategory('Textbooks');
-      setBranch('All Branches');
-      setSemester('All');
-      setDescription('');
-      setImagePreviews([]);
-      setVideoPreviews([]);
-      setVideoUrl('');
-      setHighlights(['', '', '']);
-      setSpecs([]);
-      setAvailableOptions([...allSpecOptions]);
+      resetFormState();
 
       onNavigate('Marketplace');
     } catch (error) {
+      const message = error?.response?.data?.message
+        || error?.message
+        || (isEditMode ? 'Failed to update listing.' : 'Failed to create listing.');
       dispatch({
         type: actionTypes.ADD_NOTIFICATION,
-        payload: { message: error?.message || 'Failed to create listing.', type: 'error' }
+        payload: { message, type: 'error' }
       });
     } finally {
       setIsSubmitting(false);
@@ -312,16 +625,98 @@ const Sell = ({ onNavigate }) => {
   };
 
   const INPUT_STYLE = "w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition";
+  const isMerchant = (state.user?.accountType || 'INDIVIDUAL').toUpperCase() === 'MERCHANT';
+  const canManageListings = Boolean(state.user?.canManageListings);
+  const verificationStatus = (state.user?.merchantVerificationStatus || (isMerchant ? 'PENDING' : 'NOT_REQUIRED')).toUpperCase();
+
+  if (!state.isLoggedIn) {
+    return (
+      <div className="max-w-xl mx-auto py-16 px-4">
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Sign in required</h1>
+          <p className="text-slate-600 dark:text-slate-300 mt-3">
+            Please sign in with a Merchant account to list campus items.
+          </p>
+          <button
+            onClick={() => onNavigate('Login')}
+            className="mt-6 px-5 py-2.5 rounded-lg bg-cyan-700 hover:bg-cyan-800 text-white font-semibold transition-colors"
+          >
+            Go to Sign in
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isMerchant) {
+    return (
+      <div className="max-w-2xl mx-auto py-16 px-4">
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-8 shadow-sm">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Merchant Access Needed</h1>
+          <p className="text-slate-600 dark:text-slate-300 mt-3">
+            Listing items is limited to student Merchant accounts to keep this marketplace trustworthy and campus-focused.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              onClick={() => onNavigate('Signup')}
+              className="px-5 py-2.5 rounded-lg bg-cyan-700 hover:bg-cyan-800 text-white font-semibold transition-colors"
+            >
+              Create Merchant Account
+            </button>
+            <button
+              onClick={() => onNavigate('Account')}
+              className="px-5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            >
+              Go to Account
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!canManageListings) {
+    return (
+      <div className="max-w-2xl mx-auto py-16 px-4">
+        <div className="bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-700/40 rounded-xl p-8 shadow-sm">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Merchant Verification Pending</h1>
+          <p className="text-slate-600 dark:text-slate-300 mt-3">
+            Submit your Merchant profile for admin approval to unlock listing access. Current status: <span className="font-semibold">{verificationStatus}</span>
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              onClick={() => onNavigate('Account')}
+              className="px-5 py-2.5 rounded-lg bg-cyan-700 hover:bg-cyan-800 text-white font-semibold transition-colors"
+            >
+              Open Merchant Profile
+            </button>
+            <button
+              onClick={() => onNavigate('SellerDashboard')}
+              className="px-5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            >
+              Open Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isEditMode && isLoadingEditData) {
+    return (
+      <div className="py-12 text-center text-slate-600 dark:text-slate-300">Loading listing details...</div>
+    );
+  }
 
   return (
     <div className="min-h-[60vh] py-8">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-2xl mx-auto p-8 space-y-6 bg-white dark:bg-slate-800 rounded-xl shadow-lg"
+        className="w-full max-w-2xl mx-auto p-4 sm:p-8 space-y-6 bg-white dark:bg-slate-800 rounded-xl shadow-lg"
       >
         <h2 className="text-3xl font-bold text-center text-slate-900 dark:text-white">
-          Create Your Listing
+          {isEditMode ? 'Edit Your Listing' : 'Create Your Listing'}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Info */}
@@ -331,7 +726,7 @@ const Sell = ({ onNavigate }) => {
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Item Name*</label>
               <input type="text" value={itemName} onChange={e => setItemName(e.target.value)} required className={`mt-1 ${INPUT_STYLE}`}/>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Price (₹)*</label>
                 <input
@@ -360,7 +755,7 @@ const Sell = ({ onNavigate }) => {
             </div>
             
             {/* Added Branch and Semester dropdowns */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Branch*</label>
                 <select 
@@ -386,6 +781,68 @@ const Sell = ({ onNavigate }) => {
                     <option key={sem} value={sem}>{sem}</option>
                   ))}
                 </select>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 bg-slate-50/80 dark:bg-slate-900/30">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  Listing for a specific subject? Suggest branch and semester automatically.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleSuggestAcademicTarget}
+                  className="rounded-md border border-cyan-500/40 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-700 hover:bg-cyan-100 dark:border-cyan-400/40 dark:bg-cyan-900/20 dark:text-cyan-200 dark:hover:bg-cyan-900/30"
+                >
+                  Suggest Branch & Semester
+                </button>
+              </div>
+              {targetSuggestion && (
+                <p className="mt-2 text-xs text-cyan-700 dark:text-cyan-300">{targetSuggestion}</p>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Availability*</label>
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInStock(true);
+                    if (stockQuantity === '0') {
+                      setStockQuantity('');
+                    }
+                  }}
+                  className={`rounded-md px-3 py-2 text-sm font-semibold transition ${inStock
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'}`}
+                >
+                  In Stock
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInStock(false);
+                    setStockQuantity('0');
+                  }}
+                  className={`rounded-md px-3 py-2 text-sm font-semibold transition ${!inStock
+                    ? 'bg-rose-600 text-white'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'}`}
+                >
+                  Out of Stock
+                </button>
+              </div>
+              <div className="mt-3">
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Quantity (optional)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={stockQuantity}
+                  onChange={(e) => setStockQuantity(e.target.value)}
+                  disabled={!inStock}
+                  placeholder={inStock ? 'e.g., 5' : '0'}
+                  className={`mt-1 ${INPUT_STYLE} ${!inStock ? 'opacity-70 cursor-not-allowed' : ''}`}
+                />
               </div>
             </div>
           </fieldset>
@@ -418,10 +875,20 @@ const Sell = ({ onNavigate }) => {
           {/* Image & Video Upload */}
           <fieldset className="space-y-4 p-4 border rounded-lg">
             <legend className="text-lg font-semibold px-2">Media</legend>
+            {isEditMode && (
+              <p className="text-xs text-cyan-700 dark:text-cyan-300">
+                Uploading media in edit mode will replace the current listing media after saving.
+              </p>
+            )}
             
             {/* Images section */}
             <div>
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Images*</label>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  {isEditMode ? `Images (Optional, max ${MAX_IMAGES})` : `Images* (max ${MAX_IMAGES})`}
+                </label>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{imagePreviews.length}/{MAX_IMAGES} images</span>
+              </div>
               <div className="mt-2 flex items-center flex-wrap gap-4">
                 {imagePreviews.map((src, index) => (
                   <div key={index} className="relative w-24 h-24">
@@ -436,19 +903,21 @@ const Sell = ({ onNavigate }) => {
                     </button>
                   </div>
                 ))}
-                <label htmlFor="file-upload" title="Upload images" className="cursor-pointer w-24 h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-slate-400 hover:border-indigo-500">
-                  <UploadIcon />
-                  <span className="text-xs">Add Image</span>
-                  <input id="file-upload" name="file-upload" type="file" className="sr-only" accept="image/*" onChange={handleImageChange} multiple />
-                </label>
+                {imagePreviews.length < MAX_IMAGES && (
+                  <label htmlFor="file-upload" title="Upload images" className="cursor-pointer w-24 h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-slate-400 hover:border-indigo-500">
+                    <UploadIcon />
+                    <span className="text-xs">Add Image</span>
+                    <input id="file-upload" name="file-upload" type="file" className="sr-only" accept="image/*" onChange={handleImageChange} multiple />
+                  </label>
+                )}
               </div>
             </div>
             
             {/* New Video Upload section */}
             <div>
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Videos (Optional, max 5)</label>
-                <span className="text-xs text-slate-500 dark:text-slate-400">{videoPreviews.length}/5 videos</span>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Videos (Optional, max {MAX_VIDEOS})</label>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{videoPreviews.length}/{MAX_VIDEOS} videos</span>
               </div>
               
               {videoError && (
@@ -477,7 +946,7 @@ const Sell = ({ onNavigate }) => {
                   </div>
                 ))}
                 
-                {videoPreviews.length < 5 && (
+                {videoPreviews.length < MAX_VIDEOS && (
                   <label htmlFor="video-upload" title="Upload videos" className="cursor-pointer w-32 h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-slate-400 hover:border-indigo-500">
                     <UploadIcon />
                     <span className="text-xs">Add Video</span>
@@ -525,20 +994,20 @@ const Sell = ({ onNavigate }) => {
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Specifications (Optional)</label>
               <div className="space-y-2 max-w-2xl">
                 {specs.map((spec, i) => (
-                  <div key={i} className="flex gap-2 mt-1 bg-slate-100 dark:bg-slate-700/40 rounded px-2 py-1 items-center">
+                  <div key={i} className="mt-1 flex flex-col gap-2 bg-slate-100 dark:bg-slate-700/40 rounded px-2 py-1 sm:flex-row sm:items-center">
                     <input 
                       type="text" 
                       value={spec.key} 
                       onChange={e => handleSpecChange(i, 'key', e.target.value)} 
                       placeholder={spec.placeholder.key} 
-                      className={`w-1/3 ${INPUT_STYLE}`}
+                      className={`w-full sm:w-1/3 ${INPUT_STYLE}`}
                     />
                     <input 
                       type="text" 
                       value={spec.value} 
                       onChange={e => handleSpecChange(i, 'value', e.target.value)} 
                       placeholder={spec.placeholder.value} 
-                      className={`w-2/3 ${INPUT_STYLE}`}
+                      className={`w-full sm:w-2/3 ${INPUT_STYLE}`}
                     />
                     <button 
                       type="button" 
@@ -577,7 +1046,9 @@ const Sell = ({ onNavigate }) => {
             disabled={isSubmitting}
             className="w-full py-3 px-4 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold rounded-lg transition shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? 'Listing Item...' : 'List My Item'}
+            {isSubmitting
+              ? (isEditMode ? 'Saving Changes...' : 'Listing Item...')
+              : (isEditMode ? 'Save Listing Changes' : 'List My Item')}
           </button>
         </form>
       </motion.div>

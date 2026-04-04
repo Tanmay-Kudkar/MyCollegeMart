@@ -56,6 +56,9 @@ const ProductDetail = ({ product: initialProduct, onNavigate }) => {
   if (loading) return <div>Loading...</div>;
   if (error || !product) return <div>Product not found</div>;
 
+        const stockQuantity = product?.stockQuantity == null ? null : Number(product.stockQuantity);
+        const isInStock = product?.inStock !== false && (stockQuantity == null || stockQuantity > 0);
+
     const mediaImages = mediaItems
         .filter((item) => item.mediaType === 'IMAGE' && item.url)
         .map((item) => item.url);
@@ -72,6 +75,13 @@ const ProductDetail = ({ product: initialProduct, onNavigate }) => {
     const uniqueGalleryImages = [...new Set(galleryImages)];
 
   const handleAddToCart = async () => {
+            if (!isInStock) {
+                    dispatch({
+                        type: actionTypes.ADD_NOTIFICATION,
+                        payload: { message: 'This item is currently out of stock.', type: 'error' }
+                    });
+                    return;
+            }
       // Enforce Prime Membership limit = 1
       if (product?.id === 'prime-membership' && state.cart?.items?.['prime-membership']) {
           dispatch({ 
@@ -166,12 +176,20 @@ const ProductDetail = ({ product: initialProduct, onNavigate }) => {
                       <div className="md:col-span-1">
                           <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border">
                               <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">₹{product.price?.toFixed(2)}</p>
-                              <p className="mt-2 text-green-600 dark:text-green-400 font-semibold">In Stock</p>
-                              <p className="text-sm text-slate-500">Ready for campus pickup.</p>
+                              <p className={`mt-2 font-semibold ${isInStock ? 'text-green-600 dark:text-green-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                {isInStock
+                                  ? stockQuantity != null
+                                    ? `In Stock (${stockQuantity})`
+                                    : 'In Stock'
+                                  : 'Out of Stock'}
+                              </p>
+                              <p className="text-sm text-slate-500">
+                                {isInStock ? 'Ready for campus pickup.' : 'Seller has marked this listing unavailable right now.'}
+                              </p>
                               <div className="mt-6 space-y-3">
                                   <button 
                                       onClick={handleAddToCart} 
-                                      disabled={isAdding}
+                                      disabled={isAdding || !isInStock}
                                       className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 disabled:bg-indigo-400 flex items-center justify-center"
                                   >
                                       {isAdding ? (
@@ -180,7 +198,7 @@ const ProductDetail = ({ product: initialProduct, onNavigate }) => {
                                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                           </svg>
                                       ) : (
-                                          'Add to Cart'
+                                          isInStock ? 'Add to Cart' : 'Currently Unavailable'
                                       )}
                                   </button>
                                    {product.isRentable && <button className="w-full bg-sky-600 text-white py-3 rounded-lg font-semibold hover:bg-sky-700">Rent Item</button>}

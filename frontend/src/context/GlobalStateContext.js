@@ -9,6 +9,16 @@ const buildGuestUser = () => ({
   id: null,
   displayName: 'Guest',
   email: null,
+  accountType: 'INDIVIDUAL',
+  merchantVerificationStatus: 'NOT_REQUIRED',
+  canManageListings: false,
+  isAdmin: false,
+  isMaster: false,
+  shopName: null,
+  shopTagline: null,
+  shopDescription: null,
+  shopPhone: null,
+  shopCampusLocation: null,
   isPrimeMember: false,
   primeExpiryDate: null,
 });
@@ -44,6 +54,14 @@ const getInitialWallet = () => {
 const normalizeUser = (user) => ({
   ...buildGuestUser(),
   ...(user || {}),
+  accountType: (user?.accountType || 'INDIVIDUAL').toUpperCase(),
+  merchantVerificationStatus: (user?.merchantVerificationStatus
+    || ((user?.accountType || '').toUpperCase() === 'MERCHANT' ? 'PENDING' : 'NOT_REQUIRED')).toUpperCase(),
+  canManageListings: Boolean(user?.canManageListings)
+    || (((user?.accountType || '').toUpperCase() === 'MERCHANT')
+      && (user?.merchantVerificationStatus || '').toUpperCase() === 'APPROVED'),
+  isAdmin: Boolean(user?.isAdmin),
+  isMaster: Boolean(user?.isMaster),
   isPrimeMember: Boolean(user?.isPrimeMember),
 });
 

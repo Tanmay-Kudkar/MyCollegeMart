@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import PlaceholderPage from '../../components/common/PlaceholderPage';
+import { ai as aiApi } from '../../utils/api';
 
 const StudyCorner = () => {
   const [chatHistory, setChatHistory] = useState([{
@@ -14,27 +15,48 @@ const StudyCorner = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
 
+  const getAiReply = async (message, conversation) => {
+    const history = conversation
+      .slice(-8)
+      .map((entry) => ({
+        role: entry.role === 'bot' ? 'assistant' : 'user',
+        text: entry.text,
+      }));
+
+    const response = await aiApi.chat({
+      assistantType: 'STUDY_PLANNER',
+      message,
+      history,
+    });
+
+    const reply = response?.data?.reply;
+    if (!reply || !reply.trim()) {
+      throw new Error('AI returned an empty response.');
+    }
+
+    return reply.trim();
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!userInput.trim()) return;
 
-    const newUserMessage = { role: 'user', text: userInput };
+    const prompt = userInput.trim();
+    const newUserMessage = { role: 'user', text: prompt };
     const newChatHistory = [...chatHistory, newUserMessage];
     setChatHistory(newChatHistory);
     setUserInput('');
     setIsLoading(true);
 
-    // Mock AI response
-    setTimeout(() => {
-      setChatHistory(prev => [
-        ...prev, 
-        { 
-          role: 'bot', 
-          text: "That sounds like a good plan! I recommend breaking down your study sessions into 25-minute focused periods with 5-minute breaks. Make sure to review key concepts each week and practice with past exam questions. Would you like me to create a detailed weekly schedule?" 
-        }
-      ]);
+    try {
+      const reply = await getAiReply(prompt, newChatHistory);
+      setChatHistory(prev => [...prev, { role: 'bot', text: reply }]);
+    } catch (error) {
+      const fallbackMessage = error?.message || 'I could not reach the AI planner right now. Please try again.';
+      setChatHistory(prev => [...prev, { role: 'bot', text: fallbackMessage }]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
   
   return (
@@ -45,7 +67,7 @@ const StudyCorner = () => {
           {chatHistory.map((msg, index) => (
             <div key={index} className={`flex ${msg.role === 'bot' ? 'justify-start' : 'justify-end'}`}>
               <div className={`max-w-md p-3 rounded-lg ${msg.role === 'bot' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200' : 'bg-indigo-500 text-white'}`}>
-                <div className="prose dark:prose-invert prose-p:my-1" dangerouslySetInnerHTML={{ __html: msg.text }} />
+                <div className="whitespace-pre-wrap break-words">{msg.text}</div>
               </div>
             </div>
           ))}

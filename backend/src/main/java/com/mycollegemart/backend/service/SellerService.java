@@ -5,7 +5,6 @@ import com.mycollegemart.backend.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,8 +19,8 @@ public class SellerService {
         this.productRepository = productRepository;
     }
 
-    public Map<String, Object> getDashboardOverview() {
-        List<Product> products = productRepository.findAll();
+    public Map<String, Object> getDashboardOverview(Long sellerUserId) {
+        List<Product> products = productRepository.findByListedByUserIdOrderByCreatedAtDesc(sellerUserId);
 
         int activeListings = products.size();
         double averageRating = products.stream()
@@ -32,16 +31,21 @@ public class SellerService {
                 .orElse(0.0);
 
         List<Map<String, Object>> recentListings = products.stream()
-                .sorted(Comparator.comparing(Product::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
-                        .reversed())
                 .limit(8)
                 .map(product -> {
                     Map<String, Object> item = new HashMap<>();
                     item.put("id", product.getId());
                     item.put("name", product.getName());
+                    item.put("description", product.getDescription());
                     item.put("price", product.getPrice());
+                    item.put("category", product.getCategory());
+                    item.put("branch", product.getBranch());
+                    item.put("semester", product.getSemester());
                     item.put("imageUrl", product.getImageUrl());
                     item.put("rating", product.getRating());
+                    item.put("inStock", product.getInStock());
+                    item.put("stockQuantity", product.getStockQuantity());
+                    item.put("listedByUserId", product.getListedByUserId());
                     item.put("createdAt", product.getCreatedAt());
                     return item;
                 })

@@ -19,6 +19,8 @@ const ShoppingCart = ({ isOpen, onClose, onNavigate }) => {
         price: Number(item.price || 0),
         imageUrl: item.imageUrl,
         quantity: Number(item.quantity || 1),
+        inStock: item.inStock !== false,
+        stockQuantity: item.stockQuantity == null ? null : Number(item.stockQuantity),
       };
       return acc;
     }, {});
@@ -39,6 +41,14 @@ const ShoppingCart = ({ isOpen, onClose, onNavigate }) => {
   }, [isOpen, state.isLoggedIn, state.user?.id]);
   
   const handleIncreaseQuantity = async (productId) => {
+    if (state.cart.items[productId]?.inStock === false) {
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'This item is out of stock.', type: 'error' }
+      });
+      return;
+    }
+
     // Block Prime Membership quantity > 1
     if (productId === 'prime-membership') {
       dispatch({
@@ -178,6 +188,9 @@ const ShoppingCart = ({ isOpen, onClose, onNavigate }) => {
                         {item.name}
                       </h3>
                       <p className="text-indigo-600 dark:text-indigo-400 font-semibold">₹{item.price.toFixed(2)}</p>
+                      {item.inStock === false && (
+                        <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">Out of stock</p>
+                      )}
                       <div className="flex items-center mt-1">
                         <button onClick={() => handleDecreaseQuantity(item.id)} className="p-1 rounded-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600">
                           <RemoveIcon />
@@ -185,8 +198,8 @@ const ShoppingCart = ({ isOpen, onClose, onNavigate }) => {
                         <span className="px-3">{item.quantity}</span>
                         <button 
                           onClick={() => handleIncreaseQuantity(item.id)}
-                          className={`p-1 rounded-full ${item.id === 'prime-membership' ? 'bg-slate-200 dark:bg-slate-700 cursor-not-allowed opacity-60' : 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600'}`}
-                          disabled={item.id === 'prime-membership'}
+                          className={`p-1 rounded-full ${item.id === 'prime-membership' || item.inStock === false ? 'bg-slate-200 dark:bg-slate-700 cursor-not-allowed opacity-60' : 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600'}`}
+                          disabled={item.id === 'prime-membership' || item.inStock === false}
                         >
                           <AddIcon />
                         </button>

@@ -10,3 +10,7 @@ Frontend no longer needs Google client ID or client secret for authentication.
 Recommended frontend variable:
 
 - VITE_API_URL=https://your-backend-domain/api
+
+Deployment note:
+
+- If VITE_API_URL is set to backend root (for example, https://your-backend-domain), frontend now auto-normalizes it to end with /api.

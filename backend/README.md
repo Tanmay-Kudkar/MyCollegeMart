@@ -25,8 +25,15 @@ Common variables:
 - FRONTEND_BASE_URL
 - JWT_SECRET (minimum 32 characters)
 - JWT_EXPIRATION
+- APP_ADMIN_EMAILS (comma-separated admin emails)
+- APP_MASTER_EMAIL (single master account email)
+- APP_MASTER_PASSWORD (master account password)
 - RAZORPAY_KEY_ID (required for online checkout)
 - RAZORPAY_KEY_SECRET (required for online checkout)
+
+Master login notes:
+- When APP_MASTER_EMAIL and APP_MASTER_PASSWORD are set, backend bootstraps a master user with full access (admin + listing + skill service creation).
+- Use frontend login portal "Master" for this account.
 
 ## Run
 Windows PowerShell:

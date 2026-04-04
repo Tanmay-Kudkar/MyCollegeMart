@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import { HeartIcon, ShoppingCartIcon } from '../UI/Icons';
 import { products, wishlist as wishlistApi } from '../../utils/api';
@@ -45,6 +44,13 @@ const ProductCard = ({ product, onProductSelect, compact = false }) => {
     const handleAddToCart = async (e) => {
         e.stopPropagation();
         if (isAdding) return;
+        if (product?.inStock === false || (product?.stockQuantity != null && Number(product.stockQuantity) <= 0)) {
+            dispatch({
+                type: actionTypes.ADD_NOTIFICATION,
+                payload: { message: 'This item is currently out of stock.', type: 'error' }
+            });
+            return;
+        }
 
         setIsAdding(true);
         try {
@@ -76,11 +82,12 @@ const ProductCard = ({ product, onProductSelect, compact = false }) => {
     const isPrimeExclusive = product.isPrimeExclusive;
     const userIsPrime = state.user.isPrimeMember;
     const canPurchase = !isPrimeExclusive || userIsPrime;
+    const stockQuantity = product?.stockQuantity == null ? null : Number(product.stockQuantity);
+    const isInStock = product?.inStock !== false && (stockQuantity == null || stockQuantity > 0);
 
     return (
-        <motion.div
-            whileHover={{ y: -3 }}
-            className={`bg-white dark:bg-slate-800 rounded-lg overflow-hidden shadow ${compact ? 'hover:shadow-md' : 'hover:shadow-lg'} transition-all relative cursor-pointer`}
+        <div
+            className={`group bg-white dark:bg-slate-800 rounded-lg overflow-hidden shadow-sm ${compact ? 'hover:-translate-y-1 hover:shadow-xl hover:shadow-cyan-100/70 dark:hover:shadow-cyan-950/20' : 'hover:-translate-y-1 hover:shadow-2xl'} transition-all duration-300 relative cursor-pointer`}
             onClick={() => onProductSelect(product)}
         >
             {isPrimeExclusive && (
@@ -88,25 +95,34 @@ const ProductCard = ({ product, onProductSelect, compact = false }) => {
                     PRIME
                 </div>
             )}
+            {!isInStock && (
+                <div className="absolute top-2 left-12 z-10 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded">
+                    OUT OF STOCK
+                </div>
+            )}
             <div className={`relative w-full ${compact ? 'h-36 md:h-40' : 'h-56'} overflow-hidden`}>
                 <img 
                     src={product.imageUrl} 
                     alt={product.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
                 />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-900/35 via-slate-900/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                 <button
                     onClick={handleWishlistToggle}
                     disabled={isUpdatingWishlist}
-                    className={`absolute top-2 left-2 rounded-full bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700 transition ${compact ? 'p-1' : 'p-1.5'}`}
+                    className={`absolute top-2 left-2 rounded-full bg-white/85 dark:bg-slate-800/85 hover:bg-white dark:hover:bg-slate-700 transition-all duration-200 hover:scale-110 hover:shadow-md active:scale-95 ${compact ? 'p-1' : 'p-1.5'}`}
                     aria-label="Toggle Wishlist"
                 >
-                    <HeartIcon filled={isWishlisted} />
+                    <HeartIcon
+                        filled={isWishlisted}
+                        className={`${compact ? 'h-5 w-5' : 'h-6 w-6'} ${isWishlisted ? 'text-rose-500 dark:text-rose-400' : 'text-slate-700 dark:text-slate-200'} transition-colors`}
+                    />
                 </button>
                 {canPurchase && (
                     <button
                         onClick={handleAddToCart}
-                        disabled={isAdding}
-                        className="absolute bottom-2 right-2 p-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-400 transition"
+                        disabled={isAdding || !isInStock}
+                        className="absolute bottom-2 right-2 p-2 rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-700 hover:scale-110 hover:-translate-y-0.5 disabled:bg-indigo-400 disabled:shadow-none disabled:scale-100 disabled:translate-y-0 transition-all duration-200"
                         aria-label="Add to Cart"
                     >
                         {isAdding ? (
@@ -122,13 +138,13 @@ const ProductCard = ({ product, onProductSelect, compact = false }) => {
             </div>
             <div className={compact ? 'p-3' : 'p-4'}>
                 <h3
-                    className={`${compact ? 'text-sm' : 'text-base'} font-medium text-slate-900 dark:text-white truncate`}
+                    className={`${compact ? 'text-sm' : 'text-base'} font-medium text-slate-900 dark:text-white truncate transition-colors group-hover:text-cyan-700 dark:group-hover:text-cyan-300`}
                     title={product.name}
                 >
                     {product.name}
                 </h3>
                 <div className="flex justify-between items-center mt-1">
-                    <p className={`${compact ? 'text-sm' : 'text-base'} font-semibold text-indigo-600 dark:text-indigo-400`}>
+                    <p className={`${compact ? 'text-sm' : 'text-base'} font-semibold text-indigo-600 dark:text-indigo-400 transition-colors group-hover:text-cyan-700 dark:group-hover:text-cyan-300`}>
                         ₹{Number(product.price).toFixed(2)}
                     </p>
                     {product.rating && (
@@ -139,8 +155,15 @@ const ProductCard = ({ product, onProductSelect, compact = false }) => {
                         </div>
                     )}
                 </div>
+                <p className={`mt-1 text-[11px] font-semibold ${isInStock ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                    {isInStock
+                        ? stockQuantity != null
+                            ? `In stock (${stockQuantity})`
+                            : 'In stock'
+                        : 'Out of stock'}
+                </p>
             </div>
-        </motion.div>
+        </div>
     );
 };
 

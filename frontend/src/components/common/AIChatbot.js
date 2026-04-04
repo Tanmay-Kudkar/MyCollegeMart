@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../../context/ThemeContext';
+import { ai as aiApi } from '../../utils/api';
 import { SendIcon, CloseIcon } from '../UI/Icons';
 
 const AIChatbot = ({ isChatOpen, setIsChatOpen, onNavigate }) => {
@@ -17,46 +18,53 @@ const AIChatbot = ({ isChatOpen, setIsChatOpen, onNavigate }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
   
-  // Sample responses for demo purposes
-  const getBotResponse = (message) => {
-    const lowerMsg = message.toLowerCase();
-    
-    if (lowerMsg.includes('hello') || lowerMsg.includes('hi')) {
-      return "Hello there! How can I help you with your college shopping today?";
-    } else if (lowerMsg.includes('book') || lowerMsg.includes('textbook')) {
-      return "We have a great selection of textbooks! You can find them in the Marketplace section. Would you like me to take you there?";
-    } else if (lowerMsg.includes('calculator')) {
-      return "We have the FX-991ES-Plus for ₹800 and the FX-991CW for ₹1000. Both are available now! Would you like to see them?";
-    } else if (lowerMsg.includes('lab') || lowerMsg.includes('labcoat')) {
-      return "Yes! We have Workshop Labcoats in blue for ₹450. Would you like to see more lab equipment?";
-    } else if (lowerMsg.includes('drawing') || lowerMsg.includes('engineering drawing')) {
-      return "For engineering drawing, we have complete kits starting at ₹1200. Prime members also get special assignment help. Would you like to learn more about Prime?";
-    } else if (lowerMsg.includes('prime')) {
-      return "MyCollegeMart Prime gives you free delivery, exclusive deals, and special access to premium study materials for just ₹299/year. Want to check it out?";
-    } else if (lowerMsg.includes('sell')) {
-      return "You can sell your used textbooks, notes, and equipment on our platform! Just click 'Sell Items' and follow the simple steps. Would you like me to guide you there?";
-    } else if (lowerMsg.includes('thank')) {
-      return "You're welcome! Let me know if you need anything else. Happy shopping! 😊";
-    } else {
-      return "I'm not sure I understand. Would you like to browse our marketplace, learn about Prime membership, or get help with selling items?";
+  const requestReply = async (userMessage, nextConversation) => {
+    const history = nextConversation
+      .slice(-8)
+      .map((msg) => ({
+        role: msg.role === 'bot' ? 'assistant' : 'user',
+        text: msg.text,
+      }));
+
+    const response = await aiApi.chat({
+      assistantType: 'MARKETMATE',
+      message: userMessage,
+      history,
+    });
+
+    const reply = response?.data?.reply;
+    if (!reply || !reply.trim()) {
+      throw new Error('AI returned an empty response.');
     }
+
+    return reply.trim();
   };
-  
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (input.trim() === '') return;
-    
-    // Add user message
-    const newMessages = [...messages, { role: 'user', text: input }];
-    setMessages(newMessages);
+
+  const sendMessage = async (rawMessage) => {
+    const message = (rawMessage || '').trim();
+    if (!message || isTyping) {
+      return;
+    }
+
+    const nextConversation = [...messages, { role: 'user', text: message }];
+    setMessages(nextConversation);
     setInput('');
     setIsTyping(true);
-    
-    // Simulate bot thinking and typing
-    setTimeout(() => {
-      setMessages([...newMessages, { role: 'bot', text: getBotResponse(input) }]);
+
+    try {
+      const reply = await requestReply(message, nextConversation);
+      setMessages((prev) => [...prev, { role: 'bot', text: reply }]);
+    } catch (error) {
+      const fallbackMessage = error?.message || 'I could not reach the AI service right now. Please try again shortly.';
+      setMessages((prev) => [...prev, { role: 'bot', text: fallbackMessage }]);
+    } finally {
       setIsTyping(false);
-    }, 1000);
+    }
+  };
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    await sendMessage(input);
   };
   
   
@@ -138,29 +146,26 @@ const AIChatbot = ({ isChatOpen, setIsChatOpen, onNavigate }) => {
             {/* Quick buttons */}
             <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-700 flex gap-2 overflow-x-auto scrollbar-hide">
               <button 
-                onClick={() => {
-                  setMessages([...messages, { role: 'user', text: 'Show me calculators' }, { role: 'bot', text: getBotResponse('calculator') }]);
-                }}
+                onClick={() => sendMessage('Show me calculators')}
                 className="whitespace-nowrap px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-xs hover:bg-indigo-200 dark:hover:bg-indigo-800/30"
                 title="Quick action: Ask about calculators"
+                disabled={isTyping}
               >
                 Show calculators
               </button>
               <button 
-                onClick={() => {
-                  setMessages([...messages, { role: 'user', text: 'Tell me about Prime' }, { role: 'bot', text: getBotResponse('prime') }]);
-                }}
+                onClick={() => sendMessage('Tell me about Prime membership')}
                 className="whitespace-nowrap px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-xs hover:bg-indigo-200 dark:hover:bg-indigo-800/30"
                 title="Quick action: Ask about Prime"
+                disabled={isTyping}
               >
                 About Prime
               </button>
               <button 
-                onClick={() => {
-                  setMessages([...messages, { role: 'user', text: 'How do I sell items?' }, { role: 'bot', text: getBotResponse('sell') }]);
-                }}
+                onClick={() => sendMessage('How do I sell items?')}
                 className="whitespace-nowrap px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs hover:bg-green-200 dark:hover:bg-green-800/30"
                 title="Quick action: Ask how to sell"
+                disabled={isTyping}
               >
                 How to sell
               </button>
@@ -174,6 +179,7 @@ const AIChatbot = ({ isChatOpen, setIsChatOpen, onNavigate }) => {
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Type a message..."
                 className="flex-grow px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-l-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                disabled={isTyping}
               />
               <button
                 type="submit"
