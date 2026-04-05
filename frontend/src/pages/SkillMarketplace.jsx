@@ -66,6 +66,8 @@ const FILTER_SELECT_STYLE = 'w-full rounded-lg border border-slate-300 bg-slate-
 const CREATE_INPUT_STYLE = 'mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200';
 const SKILL_TYPES = ['Assignment', 'Practical', 'Tutoring', 'Project'];
 const SKILL_SEMESTERS = ['All', 1, 2, 3, 4, 5, 6, 7, 8];
+const SKILL_MARKETPLACE_FETCH_TIMEOUT_MS = 4000;
+const SKILL_MARKETPLACE_RETRY_MS = 1000;
 
 const TYPE_STYLES = {
   Assignment: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
@@ -194,23 +196,74 @@ const SkillMarketplace = ({ onNavigate }) => {
   const isMaster = Boolean(state.user?.isMaster);
 
   useEffect(() => {
+    let isCancelled = false;
+
     setStatus('loading');
-    skills.getAll()
+    skills.getAll({ timeout: SKILL_MARKETPLACE_FETCH_TIMEOUT_MS })
       .then((response) => {
+        if (isCancelled) {
+          return;
+        }
+
         const items = Array.isArray(response.data) ? response.data : [];
         if (items.length > 0) {
           setServices(items);
         } else {
           setServices(SKILL_SERVICES);
         }
+        setErrorMessage('');
         setStatus('succeeded');
       })
       .catch(() => {
-        setServices(SKILL_SERVICES);
-        setErrorMessage('Showing fallback services because backend data could not be loaded.');
-        setStatus('succeeded');
+        if (!isCancelled) {
+          setErrorMessage('Reconnecting to the server. Services will appear automatically in a moment.');
+          setStatus('failed');
+        }
       });
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    if (status !== 'failed' || typeof window === 'undefined') {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const attemptReloadServices = () => {
+      skills.getAll({ timeout: SKILL_MARKETPLACE_FETCH_TIMEOUT_MS })
+        .then((response) => {
+          if (isCancelled) {
+            return;
+          }
+
+          const items = Array.isArray(response.data) ? response.data : [];
+          if (items.length > 0) {
+            setServices(items);
+          } else {
+            setServices(SKILL_SERVICES);
+          }
+          setErrorMessage('');
+          setStatus('succeeded');
+        })
+        .catch(() => {
+          // Keep retrying until backend is reachable.
+        });
+    };
+
+    attemptReloadServices();
+    const retryInterval = window.setInterval(attemptReloadServices, SKILL_MARKETPLACE_RETRY_MS);
+    window.addEventListener('online', attemptReloadServices);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(retryInterval);
+      window.removeEventListener('online', attemptReloadServices);
+    };
+  }, [status]);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -533,8 +586,8 @@ const SkillMarketplace = ({ onNavigate }) => {
           )
         )}
         {status === 'failed' && (
-          <section className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-700 shadow-sm dark:border-rose-800/40 dark:bg-rose-900/10 dark:text-rose-300">
-            Unable to load services right now.
+          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-800 shadow-sm dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200">
+            Reconnecting to the server. Services will appear automatically in a moment.
           </section>
         )}
         </main>

@@ -54,6 +54,28 @@ const API_ORIGIN = (() => {
 const OAUTH_RETURN_PAGE_KEY = 'mcm.oauth.returnPage';
 const OAUTH_RETURN_PARAMS_KEY = 'mcm.oauth.returnParams';
 const OAUTH_BACK_GUARD_KEY = 'mcm.oauth.backGuardPending';
+export const API_ACTIVITY_EVENT_NAME = 'mcm:api:activity';
+
+const emitApiActivityEvent = (phase, config, extraDetail = {}) => {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') {
+    return;
+  }
+
+  const method = typeof config?.method === 'string'
+    ? config.method.toUpperCase()
+    : 'GET';
+  const url = typeof config?.url === 'string' ? config.url : '';
+
+  window.dispatchEvent(new CustomEvent(API_ACTIVITY_EVENT_NAME, {
+    detail: {
+      phase,
+      method,
+      url,
+      timestamp: Date.now(),
+      ...extraDetail,
+    },
+  }));
+};
 
 const persistOauthReturnState = () => {
   if (typeof window === 'undefined') {
@@ -164,13 +186,45 @@ const api = axios.create({
 const getApiErrorMessage = (error, fallbackMessage) => getErrorMessage(error, fallbackMessage);
 
 // Add auth token to requests
-api.interceptors.request.use(config => {
+api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  const shouldTrackActivity = config?.mcmSkipLoader !== true;
+  config.mcmTrackActivity = shouldTrackActivity;
+  if (shouldTrackActivity) {
+    emitApiActivityEvent('start', config);
+  }
+
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => {
+    if (response?.config?.mcmTrackActivity) {
+      emitApiActivityEvent('end', response.config, { ok: true });
+    }
+
+    return response;
+  },
+  (error) => {
+    if (error?.config?.mcmTrackActivity) {
+      emitApiActivityEvent('end', error.config, { ok: false });
+    }
+
+    return Promise.reject(error);
+  },
+);
+
+export const runtime = {
+  warmup: (config = {}) => api.get('/hello', {
+    timeout: 15000,
+    ...config,
+    mcmSkipLoader: true,
+  }),
+};
 
 export const auth = {
   login: async (credentials) => {
@@ -219,6 +273,24 @@ export const auth = {
       throw new Error(getApiErrorMessage(error, 'Failed to update merchant profile.'));
     }
   },
+  uploadProfileImage: async (formData) => {
+    try {
+      const response = await api.post('/auth/profile-image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, 'Failed to upload profile image.'));
+    }
+  },
+  removeProfileImage: async () => {
+    try {
+      const response = await api.delete('/auth/profile-image');
+      return response.data;
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, 'Failed to remove profile image.'));
+    }
+  },
 };
 
 export const settings = {
@@ -233,15 +305,22 @@ export const ai = {
     } catch (error) {
       throw new Error(getApiErrorMessage(error, 'AI assistant request failed.'));
     }
+  },
+  feedback: async (payload) => {
+    try {
+      return await api.post('/ai/feedback', payload);
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, 'Failed to submit AI feedback.'));
+    }
   }
 };
 
 export const products = {
-  getAll: () => api.get('/products').then((response) => ({
+  getAll: (config = {}) => api.get('/products', config).then((response) => ({
     ...response,
     data: normalizeProductsPayload(response.data),
   })),
-  getById: (id) => api.get(`/products/${id}`).then((response) => ({
+  getById: (id, config = {}) => api.get(`/products/${id}`, config).then((response) => ({
     ...response,
     data: normalizeProductsPayload(response.data),
   })),
@@ -271,10 +350,14 @@ export const products = {
     ...response,
     data: normalizeMediaCollection(response.data),
   })),
-  getQuestions: (id) => api.get(`/products/${id}/questions`),
+  getQuestions: (id, config = {}) => api.get(`/products/${id}/questions`, config),
   askQuestion: (id, question) => api.post(`/products/${id}/questions`, { question }),
   answerQuestion: (productId, questionId, answer) =>
     api.post(`/products/${productId}/questions/${questionId}/answers`, { answer }),
+  updateQuestionAnswer: (productId, questionId, answerId, answer) =>
+    api.patch(`/products/${productId}/questions/${questionId}/answers/${answerId}`, { answer }),
+  deleteQuestionAnswer: (productId, questionId, answerId) =>
+    api.delete(`/products/${productId}/questions/${questionId}/answers/${answerId}`),
   getByBranch: (branch, page = 0, size = 12) => 
     api.get(`/products/branch/${branch}?page=${page}&size=${size}`),
   search: (query) => 
@@ -295,7 +378,7 @@ export const cart = {
 };
 
 export const seller = {
-  getDashboard: () => api.get('/seller/dashboard').then((response) => {
+  getDashboard: (config = {}) => api.get('/seller/dashboard', config).then((response) => {
     const payload = response.data && typeof response.data === 'object' ? response.data : {};
     const recentListings = Array.isArray(payload.recentListings)
       ? payload.recentListings.map((item) => normalizeProduct(item))
@@ -316,11 +399,25 @@ export const admin = {
     params: { status }
   }),
   approveMerchant: (merchantId) => api.post(`/admin/merchants/${merchantId}/approve`),
-  rejectMerchant: (merchantId) => api.post(`/admin/merchants/${merchantId}/reject`)
+  rejectMerchant: (merchantId) => api.post(`/admin/merchants/${merchantId}/reject`),
+  getAiFeedback: ({ sessionId = '', feedbackType = '', limit = 20 } = {}) => api.get('/admin/ai-feedback', {
+    params: {
+      sessionId: sessionId || undefined,
+      feedbackType: feedbackType || undefined,
+      limit,
+    }
+  }),
+  getOrders: ({ query = '', limit = 20 } = {}) => api.get('/admin/orders', {
+    params: {
+      query: query || undefined,
+      limit,
+    }
+  }),
+  addTrackingEvent: (orderId, payload) => api.post(`/admin/orders/${orderId}/tracking-events`, payload)
 };
 
 export const skills = {
-  getAll: () => api.get('/skills').then((response) => ({
+  getAll: (config = {}) => api.get('/skills', config).then((response) => ({
     ...response,
     data: Array.isArray(response.data)
       ? response.data.map(normalizeSkillPayload)
@@ -366,8 +463,27 @@ export const checkout = {
   placeCodOrder: (payload) => api.post('/checkout/place-cod', payload)
 };
 
+export const wallet = {
+  createTopupOrder: (payload) => api.post('/wallet/topup/create-order', payload),
+  verifyTopupPayment: (payload) => api.post('/wallet/topup/verify-payment', payload),
+  getTransactions: (limit = 20) => api.get('/wallet/transactions', {
+    params: { limit },
+  })
+};
+
+export const primeMembership = {
+  getConfig: () => api.get('/prime-membership/config'),
+  updateConfig: async (payload) => {
+    try {
+      return await api.put('/prime-membership/config', payload);
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, 'Failed to update Prime pricing.'));
+    }
+  }
+};
+
 export const orders = {
-  getMyOrders: () => api.get('/orders/my')
+  getMyOrders: (config = {}) => api.get('/orders/my', config)
 };
 
 export async function fetchProducts() {

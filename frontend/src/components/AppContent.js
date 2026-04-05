@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Navbar from './layout/Navbar';
 import Footer from './layout/Footer';
 import ShoppingCart from './shopping/ShoppingCart';
@@ -32,13 +32,156 @@ import AssignmentCheckout from '../pages/services/AssignmentCheckout';
 import { useGlobalState, actionTypes } from '../context/GlobalStateContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from '../context/LanguageContext';
-import { auth, cart as cartApi, products as productsApi, settings as settingsApi, wishlist as wishlistApi } from '../utils/api';
+import {
+  auth,
+  cart as cartApi,
+  products as productsApi,
+  runtime as runtimeApi,
+  settings as settingsApi,
+  wishlist as wishlistApi,
+} from '../utils/api';
 
 const OAUTH_RETURN_PAGE_KEY = 'mcm.oauth.returnPage';
 const OAUTH_RETURN_PARAMS_KEY = 'mcm.oauth.returnParams';
 const OAUTH_BACK_GUARD_KEY = 'mcm.oauth.backGuardPending';
 // Supported values: 'auto' | 'premium' | 'minimal'
 const FOOTER_VARIANT = 'auto';
+const BACKEND_WARMUP_HEAD_START_MAX_MS = 1200;
+const AUTO_RECOVERY_RETRY_MS = 1000;
+const INITIAL_PRODUCTS_FETCH_TIMEOUT_MS = 10000;
+const LOADING_STUCK_FAILSAFE_MS = 12000;
+const RECOVERY_WARMUP_TIMEOUT_MS = 900;
+const RECOVERY_PRODUCTS_FETCH_TIMEOUT_MS = 3500;
+const KEEPALIVE_INTERVAL_MS = 4 * 60 * 1000;
+const ACTIVE_SESSION_WINDOW_MS = 5 * 60 * 1000;
+const BRAND_TITLE = 'MyCollegeMart';
+
+const STATIC_PAGE_TITLES = {
+  Home: 'Home',
+  Marketplace: 'Marketplace',
+  Login: 'Login',
+  Signup: 'Create Account',
+  About: 'About Us',
+  Contact: 'Contact Us',
+  Wishlist: 'Your Wishlist',
+  Account: 'Your Account',
+  Settings: 'Settings',
+  Sell: 'Sell on MyCollegeMart',
+  AdminMerchantPanel: 'Admin Dashboard',
+  Checkout: 'Checkout',
+  SellerDashboard: 'Seller Dashboard',
+  PrimeMembership: 'Prime Membership',
+  OrderTracking: 'Track Orders',
+  BookExchange: 'Book Exchange',
+  FAQ: 'Help Center',
+  Pricing: 'Pricing',
+  Careers: 'Careers',
+  StudyCorner: 'Study Corner',
+  Privacy: 'Privacy Policy',
+  Terms: 'Terms and Conditions',
+  SkillMarketplace: 'Skill Marketplace',
+  AssignmentHelp: 'Assignment Help',
+  AssignmentCheckout: 'Assignment Checkout',
+};
+
+const cleanTitleSegment = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+
+const getSafeDisplayName = (user) => {
+  const displayName = cleanTitleSegment(user?.displayName);
+  return displayName && !/^guest$/i.test(displayName) ? displayName : '';
+};
+
+const getSafeShopName = (user) => cleanTitleSegment(user?.shopName);
+
+const withBrandTitle = (title) => `${title} | ${BRAND_TITLE}`;
+
+const getDocumentTitleForPage = (page, pageParams = {}, product = null, user = null) => {
+  const safePage = String(page || 'Home');
+  const safeDisplayName = getSafeDisplayName(user);
+  const safeShopName = getSafeShopName(user);
+
+  if (safePage === 'ProductDetail') {
+    const productName = cleanTitleSegment(product?.name || product?.title || '');
+    return withBrandTitle(productName || 'Product Details');
+  }
+
+  if (safePage === 'Marketplace') {
+    const searchQuery = cleanTitleSegment(pageParams?.searchQuery);
+    const category = cleanTitleSegment(pageParams?.category);
+
+    if (searchQuery) {
+      return withBrandTitle(`Search: ${searchQuery}`);
+    }
+
+    if (category) {
+      return withBrandTitle(category);
+    }
+  }
+
+  if (safePage === 'AssignmentHelp') {
+    const service = cleanTitleSegment(pageParams?.service);
+    if (service) {
+      return withBrandTitle(`${service} Assignment Help`);
+    }
+  }
+
+  if (safePage === 'OrderTracking') {
+    const orderNumber = cleanTitleSegment(pageParams?.orderNumber || pageParams?.orderId);
+    const trackingNumber = cleanTitleSegment(pageParams?.trackingNumber);
+
+    if (orderNumber) {
+      return withBrandTitle(`Order #${orderNumber} Tracking`);
+    }
+
+    if (trackingNumber) {
+      return withBrandTitle(`Tracking #${trackingNumber}`);
+    }
+
+    return withBrandTitle('Track Orders & Deliveries');
+  }
+
+  if (safePage === 'SellerDashboard') {
+    if (safeShopName) {
+      return withBrandTitle(`${safeShopName} Seller Dashboard`);
+    }
+
+    if (safeDisplayName) {
+      return withBrandTitle(`${safeDisplayName} Seller Dashboard`);
+    }
+  }
+
+  if (safePage === 'AdminMerchantPanel' && safeDisplayName) {
+    return withBrandTitle(`Admin Dashboard - ${safeDisplayName}`);
+  }
+
+  if (safePage === 'Account' && safeDisplayName) {
+    return withBrandTitle(`${safeDisplayName} Account`);
+  }
+
+  if (safePage === 'Settings' && safeDisplayName) {
+    return withBrandTitle(`${safeDisplayName} Settings`);
+  }
+
+  if (safePage === 'Wishlist' && safeDisplayName) {
+    return withBrandTitle(`${safeDisplayName} Wishlist`);
+  }
+
+  if (safePage === 'AssignmentCheckout') {
+    const serviceType = cleanTitleSegment(pageParams?.serviceType);
+    const topic = cleanTitleSegment(pageParams?.topic);
+
+    if (topic) {
+      return withBrandTitle(`${topic} Checkout`);
+    }
+
+    if (serviceType) {
+      return withBrandTitle(`${serviceType} Assignment Checkout`);
+    }
+  }
+
+  const staticTitle = STATIC_PAGE_TITLES[safePage] || 'Home';
+  return withBrandTitle(staticTitle);
+};
 
 const getSafePageParams = (value) => (value && typeof value === 'object' ? value : {});
 
@@ -129,6 +272,10 @@ const AppContent = () => {
   const [params, setParams] = useState(() => {
     try { return JSON.parse(localStorage.getItem('mcm.pageParams') || '{}'); } catch { return {}; }
   });
+  const lastUserActivityRef = useRef(Date.now());
+  const isProductRecoveryRetrying = state.products.status === 'failed';
+  const shouldShowProductRecoveryBanner = isProductRecoveryRetrying
+    && ['Home', 'Marketplace', 'ProductDetail'].includes(currentPage);
   // const [pageData, setPageData] = useState(null);
   // const { state } = useGlobalState();
 
@@ -192,21 +339,207 @@ const AppContent = () => {
     }
   }, []);
 
-  // Handle backend OAuth redirect: /#token=... or /#authError=...
+  // Give cold backend a short warm-up head start before expensive first payload.
   useEffect(() => {
     if (state.products.status !== 'idle') {
       return;
     }
 
-    dispatch({ type: actionTypes.FETCH_PRODUCTS_START });
-    productsApi.getAll()
-      .then((response) => {
-        dispatch({ type: actionTypes.FETCH_PRODUCTS_SUCCESS, payload: response.data });
-      })
-      .catch(() => {
-        dispatch({ type: actionTypes.FETCH_PRODUCTS_FAIL, payload: 'Failed to load products' });
-      });
+    let isCancelled = false;
+
+    const warmupBackendAndFetchProducts = async () => {
+      try {
+        await Promise.race([
+          runtimeApi.warmup(),
+          new Promise((resolve) => {
+            window.setTimeout(resolve, BACKEND_WARMUP_HEAD_START_MAX_MS);
+          }),
+        ]);
+      } catch {
+        // Initial page load should continue even if warm-up ping fails.
+      }
+
+      if (isCancelled) {
+        return;
+      }
+
+      dispatch({ type: actionTypes.FETCH_PRODUCTS_START });
+
+      try {
+        const response = await productsApi.getAll({ timeout: INITIAL_PRODUCTS_FETCH_TIMEOUT_MS });
+        if (!isCancelled) {
+          dispatch({ type: actionTypes.FETCH_PRODUCTS_SUCCESS, payload: response.data });
+        }
+      } catch {
+        if (!isCancelled) {
+          dispatch({ type: actionTypes.FETCH_PRODUCTS_FAIL, payload: 'Failed to load products' });
+        }
+      }
+    };
+
+    warmupBackendAndFetchProducts();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [state.products.status, dispatch]);
+
+  useEffect(() => {
+    if (state.products.status !== 'loading' || typeof window === 'undefined') {
+      return;
+    }
+
+    const failsafeTimer = window.setTimeout(() => {
+      dispatch({ type: actionTypes.FETCH_PRODUCTS_FAIL, payload: 'Product request timed out' });
+    }, LOADING_STUCK_FAILSAFE_MS);
+
+    return () => {
+      window.clearTimeout(failsafeTimer);
+    };
+  }, [state.products.status, dispatch]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || state.products.status !== 'failed') {
+      return;
+    }
+
+    let isCancelled = false;
+    let recoveryInFlight = false;
+
+    const attemptProductsRecovery = async () => {
+      if (isCancelled || recoveryInFlight) {
+        return;
+      }
+
+      recoveryInFlight = true;
+
+      try {
+        await runtimeApi.warmup({ timeout: RECOVERY_WARMUP_TIMEOUT_MS });
+
+        if (isCancelled) {
+          return;
+        }
+
+        const response = await productsApi.getAll({
+          mcmSkipLoader: true,
+          timeout: RECOVERY_PRODUCTS_FETCH_TIMEOUT_MS,
+        });
+
+        if (!isCancelled) {
+          dispatch({ type: actionTypes.FETCH_PRODUCTS_SUCCESS, payload: response.data });
+
+          if (state.isLoggedIn) {
+            cartApi.get(state.user?.id)
+              .then((cartResponse) => {
+                const backendItems = Array.isArray(cartResponse.data?.items) ? cartResponse.data.items : [];
+                const mappedItems = backendItems.reduce((acc, item) => {
+                  acc[item.id] = {
+                    id: item.id,
+                    name: item.name,
+                    price: Number(item.price || 0),
+                    imageUrl: item.imageUrl,
+                    quantity: Number(item.quantity || 1),
+                  };
+                  return acc;
+                }, {});
+
+                dispatch({ type: actionTypes.SET_CART, payload: { items: mappedItems } });
+              })
+              .catch(() => {
+                // Keep current cart if silent recovery sync fails.
+              });
+
+            wishlistApi.get()
+              .then((wishlistResponse) => {
+                dispatch({
+                  type: actionTypes.SET_WISHLIST,
+                  payload: Array.isArray(wishlistResponse.data?.productIds) ? wishlistResponse.data.productIds : [],
+                });
+              })
+              .catch(() => {
+                // Keep current wishlist if silent recovery sync fails.
+              });
+
+            settingsApi.getMe()
+              .then((settingsResponse) => {
+                const preferences = settingsResponse.data?.preferences || {};
+                if (preferences.themeMode) {
+                  setThemePreference(preferences.themeMode);
+                }
+                if (preferences.preferredLanguage) {
+                  setLanguage(preferences.preferredLanguage);
+                }
+              })
+              .catch(() => {
+                // Keep current preferences if silent recovery sync fails.
+              });
+          }
+
+          dispatch({
+            type: actionTypes.ADD_NOTIFICATION,
+            payload: { message: 'Server is back online. Latest data synced automatically.', type: 'success' },
+          });
+        }
+      } catch {
+        // Keep retrying in the background until backend is reachable.
+      } finally {
+        recoveryInFlight = false;
+      }
+    };
+
+    attemptProductsRecovery();
+    const retryInterval = window.setInterval(attemptProductsRecovery, AUTO_RECOVERY_RETRY_MS);
+    window.addEventListener('online', attemptProductsRecovery);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(retryInterval);
+      window.removeEventListener('online', attemptProductsRecovery);
+    };
+  }, [
+    state.products.status,
+    state.isLoggedIn,
+    state.user?.id,
+    dispatch,
+    setThemePreference,
+    setLanguage,
+  ]);
+
+  useEffect(() => {
+    if (!state.isLoggedIn || typeof window === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+
+    const markUserActivity = () => {
+      lastUserActivityRef.current = Date.now();
+    };
+
+    const activityEvents = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
+    markUserActivity();
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, markUserActivity, { passive: true });
+    });
+
+    const keepAliveInterval = window.setInterval(() => {
+      const isPageVisible = document.visibilityState === 'visible';
+      const isRecentlyActive = (Date.now() - lastUserActivityRef.current) <= ACTIVE_SESSION_WINDOW_MS;
+
+      if (!isPageVisible || !isRecentlyActive) {
+        return;
+      }
+
+      runtimeApi.warmup({ timeout: 10000 }).catch(() => {
+        // Keep-alive failures are non-blocking and should stay silent.
+      });
+    }, KEEPALIVE_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(keepAliveInterval);
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, markUserActivity);
+      });
+    };
+  }, [state.isLoggedIn]);
 
   useEffect(() => {
     if (!state.isLoggedIn) {
@@ -378,6 +711,14 @@ const AppContent = () => {
     window.dispatchEvent(new Event('mcm-force-translate'));
   }, [currentPage, params]);
 
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    document.title = getDocumentTitleForPage(currentPage, params, selectedProduct, state.user);
+  }, [currentPage, params, selectedProduct, state.user]);
+
   // Escape key handler for navigation
   useEffect(() => {
     const handleEsc = (e) => {
@@ -440,7 +781,7 @@ const AppContent = () => {
       case 'PrimeMembership':
         return <PrimeMembership onNavigate={handleNavigate} />;
       case 'OrderTracking':
-        return <OrderTracking onNavigate={handleNavigate} />;
+        return <OrderTracking onNavigate={handleNavigate} pageParams={params} />;
       case 'BookExchange':
         return <BookExchange onNavigate={handleNavigate} />;
       case 'FAQ':
@@ -471,6 +812,11 @@ const AppContent = () => {
       <Navbar onCartClick={() => setIsCartOpen(true)} onNavigate={handleNavigate} />
       
       <main className="flex-grow w-full max-w-7xl mx-auto px-3 py-5 sm:px-4 sm:py-8">
+        {shouldShowProductRecoveryBanner && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200">
+            Reconnecting to the server. Fresh data will appear automatically in a moment.
+          </div>
+        )}
         {renderPage()}
       </main>
       

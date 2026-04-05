@@ -140,6 +140,11 @@ const ShoppingCart = ({ isOpen, onClose, onNavigate }) => {
         animate={{ x: isOpen ? 0 : '100%' }}
         transition={{ type: 'tween', duration: 0.3 }}
         className="fixed top-0 right-0 h-full w-full sm:w-96 bg-white dark:bg-slate-800 shadow-xl z-50 flex flex-col"
+        style={{
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingRight: 'env(safe-area-inset-right)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}
       >
         <div className="flex items-center justify-between p-4 border-b dark:border-slate-700">
           <h2 className="text-xl font-bold flex items-center">

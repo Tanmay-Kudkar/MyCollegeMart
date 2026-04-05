@@ -22,6 +22,7 @@ const Navbar = ({ onCartClick, onNavigate }) => {
   const { state, dispatch } = useGlobalState();
   const isAdmin = Boolean(state.user?.isAdmin);
   const cartItemCount = Object.values(state.cart.items).reduce((sum, item) => sum + item.quantity, 0);
+  const wishlistItemCount = Array.isArray(state.wishlist) ? state.wishlist.length : 0;
   const [searchTerm, setSearchTerm] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [isListening, setIsListening] = useState(false);
@@ -165,6 +166,11 @@ const Navbar = ({ onCartClick, onNavigate }) => {
     { name: t('nav.contact'), page: 'Contact' }
   ];
   const languageOptions = ['EN', 'HI', 'MR'];
+  const languageLabels = {
+    EN: 'English',
+    HI: 'Hindi',
+    MR: 'Marathi',
+  };
 
   return (
     <nav className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-lg sticky top-0 z-30 shadow-md">
@@ -185,7 +191,7 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="absolute left-0 mt-2 w-64 max-w-[85vw] rounded-md shadow-lg bg-white dark:bg-slate-800 ring-1 ring-black ring-opacity-5 z-50"
+                className="absolute left-0 mt-2 z-50 w-64 max-w-[85vw] rounded-xl border-2 border-slate-300 bg-slate-100 shadow-xl shadow-slate-900/10 ring-1 ring-slate-300/70 dark:border-slate-700 dark:bg-slate-800 dark:ring-slate-700"
               >
                 {/* Navigation buttons in dropdown menu */}
                 <div className="py-1" role="menu">
@@ -194,39 +200,41 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                       key={link.name}
                       type="button"
                       onClick={() => { onNavigate(link.page); setIsMenuOpen(false); }}
-                      className={`block w-full text-left px-4 py-2 text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20
-                    ${link.name === 'Sell' ? 'text-amber-600 dark:text-amber-400 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}
+                      className={`mx-2 mb-1 block w-[calc(100%-1rem)] rounded-lg border px-3 py-2.5 text-left text-sm font-semibold transition-colors
+                    ${link.name === 'Sell'
+                          ? 'border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-200 dark:border-amber-400/40 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20'
+                          : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/60'}`}
                       role="menuitem"
                     >
                       {link.name}
                     </button>
                   ))}
-                  <div className="border-t border-slate-200 dark:border-slate-700 mt-1 px-3 py-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Language</p>
-                    <div className="mt-1 flex items-center gap-1">
+                  <div className="mt-1 border-t border-slate-300 px-3 py-2 dark:border-slate-700">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-400">Language</p>
+                    <div className="mt-1 grid grid-cols-3 gap-1">
                       {languageOptions.map((code) => (
                         <button
                           key={code}
                           type="button"
                           onClick={() => applyLanguagePreference(code)}
-                          className={`rounded-md px-2 py-1 text-[11px] font-semibold transition ${((language || 'EN').toUpperCase() === code)
-                            ? 'bg-cyan-600 text-white'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'}`}
-                          aria-label={`Switch language to ${code}`}
+                          className={`w-full rounded-md px-2 py-1 text-center text-[11px] font-semibold transition ${((language || 'EN').toUpperCase() === code)
+                            ? 'border border-cyan-700 bg-cyan-700 text-white'
+                            : 'border border-slate-300 bg-slate-200 text-slate-800 hover:bg-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'}`}
+                          aria-label={`Switch language to ${languageLabels[code] || code}`}
                         >
-                          {code}
+                          {languageLabels[code] || code}
                         </button>
                       ))}
                     </div>
                   </div>
-                  <div className="border-t border-slate-200 dark:border-slate-700 mt-1 px-3 py-2 space-y-2">
+                  <div className="mt-1 space-y-2 border-t border-slate-300 px-3 py-2 dark:border-slate-700">
                     {state.isLoggedIn ? (
                       <>
                         {isAdmin && (
                           <button
                             type="button"
                             onClick={() => { onNavigate('AdminMerchantPanel'); setIsMenuOpen(false); }}
-                            className="block w-full rounded-lg border border-cyan-300 bg-cyan-50 px-3 py-2 text-center text-sm font-semibold text-cyan-700 transition-colors hover:bg-cyan-100 dark:border-cyan-400/40 dark:bg-cyan-500/10 dark:text-cyan-300 dark:hover:bg-cyan-500/20"
+                            className="block w-full rounded-lg border border-cyan-400 bg-cyan-100 px-3 py-2 text-center text-sm font-semibold text-cyan-800 transition-colors hover:bg-cyan-200 dark:border-cyan-400/40 dark:bg-cyan-500/10 dark:text-cyan-300 dark:hover:bg-cyan-500/20"
                             role="menuitem"
                           >
                             Merchant Verification
@@ -235,7 +243,7 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                         <button
                           type="button"
                           onClick={() => { onNavigate('Account'); setIsMenuOpen(false); }}
-                          className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-center text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                          className="block w-full rounded-lg border border-slate-400 bg-slate-100 px-3 py-2 text-center text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                           role="menuitem"
                         >
                           Account
@@ -243,7 +251,7 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                         <button
                           type="button"
                           onClick={handleLogout}
-                          className="block w-full rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-center text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-400/40 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:bg-rose-500/20"
+                          className="block w-full rounded-lg border border-rose-400 bg-rose-100 px-3 py-2 text-center text-sm font-semibold text-rose-800 transition-colors hover:bg-rose-200 dark:border-rose-400/40 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:bg-rose-500/20"
                           role="menuitem"
                         >
                           Logout
@@ -254,7 +262,7 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                         <button
                           type="button"
                           onClick={() => { onNavigate('Login'); setIsMenuOpen(false); }}
-                          className="block w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-center text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-50 dark:border-amber-400/40 dark:bg-slate-900 dark:text-amber-300 dark:hover:bg-amber-500/10"
+                          className="block w-full rounded-lg border border-amber-400 bg-amber-100 px-3 py-2 text-center text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-200 dark:border-amber-400/40 dark:bg-slate-900 dark:text-amber-300 dark:hover:bg-amber-500/10"
                           role="menuitem"
                         >
                           {t('login')}
@@ -370,9 +378,9 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                 className="h-8 rounded-lg border border-slate-200 bg-slate-50 px-2 text-[11px] font-bold tracking-wide text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
                 title="Language"
               >
-                <option value="EN">EN</option>
-                <option value="HI">HI</option>
-                <option value="MR">MR</option>
+                <option value="EN">English</option>
+                <option value="HI">Hindi</option>
+                <option value="MR">Marathi</option>
               </select>
 
               {!state.isLoggedIn && (
@@ -398,9 +406,16 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                 onClick={() => onNavigate('Wishlist')}
                 title="Wishlist"
                 aria="Wishlist"
-                active={state.wishlist.length > 0}
+                active={wishlistItemCount > 0}
               >
-                <HeartIcon filled={state.wishlist.length > 0} />
+                <span className="relative">
+                  <HeartIcon filled={wishlistItemCount > 0} />
+                  {wishlistItemCount > 0 && (
+                    <span className="absolute -top-2 -right-2 flex h-5 min-w-5 px-1 items-center justify-center rounded-full bg-red-500 text-[11px] text-white shadow-md ring-2 ring-white dark:ring-slate-900">
+                      {wishlistItemCount > 99 ? '99+' : wishlistItemCount}
+                    </span>
+                  )}
+                </span>
               </IconButton>
 
               <div className="relative">
@@ -438,9 +453,16 @@ const Navbar = ({ onCartClick, onNavigate }) => {
                 onClick={() => onNavigate('Wishlist')}
                 title="Wishlist"
                 aria="Wishlist"
-                active={state.wishlist.length > 0}
+                active={wishlistItemCount > 0}
               >
-                <HeartIcon filled={state.wishlist.length > 0} />
+                <span className="relative">
+                  <HeartIcon filled={wishlistItemCount > 0} />
+                  {wishlistItemCount > 0 && (
+                    <span className="absolute -top-2 -right-2 flex h-5 min-w-5 px-1 items-center justify-center rounded-full bg-red-500 text-[11px] text-white shadow-md ring-2 ring-white dark:ring-slate-900">
+                      {wishlistItemCount > 99 ? '99+' : wishlistItemCount}
+                    </span>
+                  )}
+                </span>
               </IconButton>
 
               <div className="relative">

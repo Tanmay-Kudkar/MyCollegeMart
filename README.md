@@ -98,7 +98,7 @@ flowchart LR
 MyCollegeMart/
 |- backend/                     # Spring Boot API (Java 21)
 |  |- src/main/java/...         # Controllers, services, repositories, models
-|  |- src/main/resources/       # application.properties + schema.sql
+|  |- src/main/resources/       # application.properties (loads schema from /database/schema.sql)
 |  |- README.md
 |
 |- frontend/                    # React + Vite app
@@ -230,9 +230,8 @@ Main API groups:
 ## 🌍 Deployment Notes
 
 - Frontend static deployment config: [frontend/render.yaml](frontend/render.yaml)
-- Keep schema files in sync:
-  - [backend/src/main/resources/schema.sql](backend/src/main/resources/schema.sql)
-  - [database/schema.sql](database/schema.sql)
+- Schema source of truth: [database/schema.sql](database/schema.sql)
+- Backend loads schema from [database/schema.sql](database/schema.sql) using spring.sql.init.schema-locations
 - For production hardening:
   - Set JPA_DDL_AUTO=validate
   - Use strong JWT_SECRET

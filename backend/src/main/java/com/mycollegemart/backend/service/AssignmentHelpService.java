@@ -1,6 +1,7 @@
 package com.mycollegemart.backend.service;
 
 import com.mycollegemart.backend.model.AssignmentHelpRequest;
+import com.mycollegemart.backend.model.User;
 import com.mycollegemart.backend.repository.AssignmentHelpRequestRepository;
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
@@ -28,6 +29,8 @@ public class AssignmentHelpService {
 
     private final AssignmentHelpRequestRepository assignmentHelpRequestRepository;
     private final MediaAssetService mediaAssetService;
+    private final UserService userService;
+    private final PrimeMembershipConfigService primeMembershipConfigService;
     private final String razorpayKeyId;
     private final String razorpayKeySecret;
 
@@ -35,16 +38,23 @@ public class AssignmentHelpService {
     public AssignmentHelpService(
             AssignmentHelpRequestRepository assignmentHelpRequestRepository,
             MediaAssetService mediaAssetService,
+            UserService userService,
+            PrimeMembershipConfigService primeMembershipConfigService,
             @Value("${razorpay.key-id:}") String razorpayKeyId,
             @Value("${razorpay.key-secret:}") String razorpayKeySecret) {
         this.assignmentHelpRequestRepository = assignmentHelpRequestRepository;
         this.mediaAssetService = mediaAssetService;
+        this.userService = userService;
+        this.primeMembershipConfigService = primeMembershipConfigService;
         this.razorpayKeyId = razorpayKeyId;
         this.razorpayKeySecret = razorpayKeySecret;
     }
 
     public Map<String, Object> createRequest(AssignmentHelpRequest request, List<MultipartFile> files) {
         normalize(request);
+        String normalizedDeadline = primeMembershipConfigService.normalizeDeadlineOrDefault(request.getDeadline());
+        request.setDeadline(normalizedDeadline);
+        request.setTotalAmount(primeMembershipConfigService.resolveAssignmentPrice(normalizedDeadline, false));
         request.setStatus("SUBMITTED");
         request.setPaymentMethod("DIRECT");
         request.setPaymentStatus("PENDING");
@@ -62,7 +72,17 @@ public class AssignmentHelpService {
             throw new IllegalArgumentException("Please sign in to continue");
         }
 
+        User user = userService.findById(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("User not found");
+        }
+
         normalize(request);
+        String normalizedDeadline = primeMembershipConfigService.normalizeDeadlineStrict(request.getDeadline());
+        request.setDeadline(normalizedDeadline);
+        request.setTotalAmount(
+                primeMembershipConfigService.resolveAssignmentPrice(normalizedDeadline, user.isPrimeMember()));
+
         if (request.getTotalAmount() == null || request.getTotalAmount() <= 0) {
             throw new IllegalArgumentException("Invalid request amount");
         }

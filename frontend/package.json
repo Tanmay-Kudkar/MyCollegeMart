@@ -6,6 +6,8 @@
     "@react-oauth/google": "^0.12.2",
     "axios": "^1.12.2",
     "framer-motion": "^10.12.16",
+    "highlight.js": "^11.11.1",
+    "lucide-react": "^1.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.9.1",

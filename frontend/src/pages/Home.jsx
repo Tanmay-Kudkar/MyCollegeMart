@@ -2,9 +2,52 @@ import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useGlobalState } from '../context/GlobalStateContext';
 import ProductCard from '../components/product/ProductCard';
+import PrimeJoinBanner from '../components/common/PrimeJoinBanner';
+import ProductCardSkeleton from '../components/common/ProductCardSkeleton';
+
+const SkeletonBlock = ({ className = '' }) => (
+  <div className={`mcm-skeleton-block mcm-skeleton-shimmer relative rounded ${className}`} />
+);
+
+const HomeLoadingSkeleton = () => (
+  <div className="space-y-6">
+    <section className="rounded-[24px] border border-slate-200/80 bg-white/95 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800/95 sm:p-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-2">
+          <SkeletonBlock className="h-7 w-52" />
+          <SkeletonBlock className="h-4 w-72 max-w-full" />
+        </div>
+        <SkeletonBlock className="h-5 w-20" />
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <ProductCardSkeleton key={`home-hot-deal-skeleton-${index}`} compact />
+        ))}
+      </div>
+    </section>
+
+    <section className="rounded-[24px] border border-slate-200/80 bg-white/95 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800/95 sm:p-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-2">
+          <SkeletonBlock className="h-7 w-56" />
+          <SkeletonBlock className="h-4 w-80 max-w-full" />
+        </div>
+        <SkeletonBlock className="h-5 w-16" />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, index) => (
+          <ProductCardSkeleton key={`home-featured-skeleton-${index}`} compact />
+        ))}
+      </div>
+    </section>
+  </div>
+);
 
 const Home = ({ onNavigate }) => {
   const { state } = useGlobalState();
+  const isProductsLoading = state.products?.status === 'idle' || state.products?.status === 'loading';
 
   const allProducts = useMemo(
     () => {
@@ -74,6 +117,10 @@ const Home = ({ onNavigate }) => {
     };
   }, [allProducts]);
 
+  if (isProductsLoading) {
+    return <HomeLoadingSkeleton />;
+  }
+
   return (
     <div className="relative space-y-6">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
@@ -83,63 +130,77 @@ const Home = ({ onNavigate }) => {
 
       <section className="overflow-hidden rounded-[28px] border border-slate-200/80 dark:border-slate-700 bg-white/90 dark:bg-slate-900/80 backdrop-blur-sm shadow-[0_20px_45px_-30px_rgba(15,23,42,0.45)]">
         <div className="grid lg:grid-cols-[1.75fr_1fr]">
-          <div className="relative overflow-hidden p-6 sm:p-8 md:p-10 text-white bg-gradient-to-br from-[#10255f] via-[#114784] to-[#117985]">
+          <div className="relative overflow-hidden bg-gradient-to-br from-[#0a1b45] via-[#1f4f8f] to-[#0b7a8f] p-6 text-white sm:p-8 md:p-10">
             {heroSpotlight?.imageUrl && (
               <img
                 src={heroSpotlight.imageUrl}
                 alt=""
                 aria-hidden="true"
-                className="absolute inset-0 w-full h-full object-cover opacity-[0.16]"
+                className="absolute inset-0 h-full w-full scale-105 object-cover opacity-[0.18]"
               />
             )}
-            <div className="absolute -right-16 -top-16 h-52 w-52 rounded-full bg-cyan-300/20 blur-3xl" />
-            <div className="absolute -left-14 -bottom-24 h-64 w-64 rounded-full bg-blue-950/70 blur-3xl" />
+            <div
+              className="pointer-events-none absolute -inset-y-10 -left-1/3 w-1/2 rotate-12 bg-gradient-to-r from-white/0 via-white/20 to-white/0"
+              style={{ animation: 'mcm-banner-shimmer 4.8s linear infinite' }}
+            />
+            <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-cyan-300/25 blur-3xl" />
+            <div className="pointer-events-none absolute -left-14 -bottom-24 h-64 w-64 rounded-full bg-blue-950/70 blur-3xl" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-[#07112e]/55 via-transparent to-transparent" />
 
-            <div className="relative z-10">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] font-semibold tracking-[0.14em] uppercase">
+            <div className="relative z-10 max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-slate-900/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]">
                 Campus Commerce Dashboard
               </div>
 
-              <h1 className="mcm-display mt-4 text-3xl font-extrabold leading-tight sm:text-4xl md:text-5xl">
+              <h1 className="mcm-display mt-4 text-4xl font-extrabold leading-[1.05] tracking-[-0.03em] sm:text-5xl md:text-6xl">
                 Discover Better Deals, Faster
               </h1>
-              <p className="mt-3 max-w-2xl text-base text-white/85 sm:text-lg">
+              <p className="mt-4 max-w-2xl text-base text-white/90 sm:text-xl">
                 Shop verified student listings, track flash offers, and manage buying and selling from one premium storefront.
               </p>
 
-              <div className="mt-6 flex flex-wrap gap-3">
+              <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-100/95">
+                <span className="rounded-full border border-white/25 bg-slate-900/20 px-2.5 py-1">Verified Sellers</span>
+                <span className="rounded-full border border-white/25 bg-slate-900/20 px-2.5 py-1">Realtime Tracking</span>
+                <span className="rounded-full border border-white/25 bg-slate-900/20 px-2.5 py-1">Prime Member Benefits</span>
+              </div>
+
+              <div className="mt-7 flex flex-wrap gap-3">
                 <button
                   onClick={() => onNavigate('Marketplace')}
-                  className="rounded-lg bg-amber-400 px-5 py-3 font-semibold text-slate-900 shadow hover:bg-amber-500"
+                  className="rounded-xl bg-amber-400 px-5 py-3 font-semibold text-slate-900 shadow-[0_12px_24px_-14px_rgba(251,191,36,0.9)] transition hover:-translate-y-0.5 hover:bg-amber-300"
                 >
                   Shop Now
                 </button>
                 <button
                   onClick={() => onNavigate('Sell')}
-                  className="rounded-lg border border-white/35 px-5 py-3 font-semibold text-white hover:bg-white/10"
+                  className="rounded-xl border border-white/35 bg-white/5 px-5 py-3 font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/12"
                 >
                   Start Selling
                 </button>
                 <button
                   onClick={() => onNavigate('PrimeMembership')}
-                  className="rounded-lg border border-cyan-200/40 px-5 py-3 font-semibold text-cyan-100 hover:bg-cyan-400/15"
+                  className="rounded-xl border border-cyan-200/40 bg-cyan-500/10 px-5 py-3 font-semibold text-cyan-100 transition hover:-translate-y-0.5 hover:bg-cyan-400/20"
                 >
                   Prime Benefits
                 </button>
               </div>
 
-              <div className="mt-8 grid max-w-xl grid-cols-2 gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border border-white/20 bg-white/[0.11] p-3 backdrop-blur-sm">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-white/70">Live Listings</p>
-                  <p className="mt-1 text-xl font-bold">{stats.total}</p>
+              <div className="mt-8 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-white/25 bg-white/[0.12] p-3 backdrop-blur-sm">
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-white/75">Live Listings</p>
+                  <p className="mt-1 text-2xl font-bold leading-none">{stats.total}</p>
+                  <p className="mt-1 text-[11px] text-white/70">Available now</p>
                 </div>
-                <div className="rounded-xl border border-white/20 bg-white/[0.11] p-3 backdrop-blur-sm">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-white/70">Prime Exclusive</p>
-                  <p className="mt-1 text-xl font-bold">{stats.prime}</p>
+                <div className="rounded-2xl border border-white/25 bg-white/[0.12] p-3 backdrop-blur-sm">
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-white/75">Prime Exclusive</p>
+                  <p className="mt-1 text-2xl font-bold leading-none">{stats.prime}</p>
+                  <p className="mt-1 text-[11px] text-white/70">Premium catalog</p>
                 </div>
-                <div className="rounded-xl border border-white/20 bg-white/[0.11] p-3 backdrop-blur-sm">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-white/70">Avg Price</p>
-                  <p className="mt-1 text-xl font-bold">₹{stats.average.toFixed(0)}</p>
+                <div className="rounded-2xl border border-white/25 bg-white/[0.12] p-3 backdrop-blur-sm">
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-white/75">Avg Price</p>
+                  <p className="mt-1 text-2xl font-bold leading-none">₹{stats.average.toFixed(0)}</p>
+                  <p className="mt-1 text-[11px] text-white/70">Across listings</p>
                 </div>
               </div>
             </div>
@@ -208,6 +269,8 @@ const Home = ({ onNavigate }) => {
           </div>
         </div>
       </section>
+
+      <PrimeJoinBanner onNavigate={onNavigate} />
 
       <section className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">

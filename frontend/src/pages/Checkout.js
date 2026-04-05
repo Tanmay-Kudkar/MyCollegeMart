@@ -90,6 +90,7 @@ const Checkout = ({ onNavigate }) => {
 
     setPaymentDetails({
       orderNumber: responsePayload?.orderNumber || 'N/A',
+      trackingNumber: responsePayload?.trackingNumber || null,
       paymentId: responsePayload?.paymentId || fallbackPaymentId || null,
       paymentStatus: responsePayload?.paymentStatus || (paymentMethod === 'cod' ? 'COD_PENDING' : 'PAID'),
     });
@@ -233,16 +234,31 @@ const Checkout = ({ onNavigate }) => {
           <h1 className="mcm-display mt-4 text-3xl font-bold text-slate-900 dark:text-white">Order Confirmed</h1>
           <p className="mt-2 text-slate-600 dark:text-slate-300">Thanks for shopping with MyCollegeMart.</p>
           <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">Order Number: {paymentDetails?.orderNumber}</p>
+          {paymentDetails?.trackingNumber && (
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Tracking ID: {paymentDetails.trackingNumber}</p>
+          )}
           {paymentDetails?.paymentId && (
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Payment ID: {paymentDetails.paymentId}</p>
           )}
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Payment Status: {paymentDetails?.paymentStatus}</p>
-          <button
-            onClick={() => onNavigate('Marketplace')}
-            className="mt-8 rounded-full bg-cyan-700 px-8 py-3 font-semibold text-white shadow-lg hover:bg-cyan-800"
-          >
-            Continue Shopping
-          </button>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <button
+              onClick={() => onNavigate('OrderTracking', {
+                orderNumber: paymentDetails?.orderNumber,
+                trackingNumber: paymentDetails?.trackingNumber,
+              })}
+              className="rounded-full border border-cyan-700 px-6 py-2.5 font-semibold text-cyan-700 transition hover:bg-cyan-50 dark:border-cyan-400 dark:text-cyan-300 dark:hover:bg-cyan-900/20"
+            >
+              Track This Order
+            </button>
+
+            <button
+              onClick={() => onNavigate('Marketplace')}
+              className="rounded-full bg-cyan-700 px-6 py-2.5 font-semibold text-white shadow-lg hover:bg-cyan-800"
+            >
+              Continue Shopping
+            </button>
+          </div>
         </motion.div>
       </div>
     );

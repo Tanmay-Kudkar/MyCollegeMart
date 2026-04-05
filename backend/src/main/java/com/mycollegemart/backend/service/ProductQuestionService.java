@@ -10,6 +10,7 @@ import com.mycollegemart.backend.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +37,12 @@ public class ProductQuestionService {
     }
 
     public List<Map<String, Object>> getQuestionsForProduct(Long productId) {
-        if (productId == null || productRepository.findById(productId).isEmpty()) {
+        if (productId == null) {
+            return List.of();
+        }
+
+        Product product = productRepository.findById(productId).orElse(null);
+        if (product == null) {
             return List.of();
         }
 
@@ -57,12 +63,13 @@ public class ProductQuestionService {
         return questions.stream()
                 .map(question -> mapQuestion(
                         question,
-                        answersByQuestionId.getOrDefault(question.getId(), List.of())))
+                        answersByQuestionId.getOrDefault(question.getId(), List.of()),
+                        product.getListedByUserId()))
                 .toList();
     }
 
     public Map<String, Object> createQuestion(Long productId, Long userId, String questionText) {
-        ensureProductExists(productId);
+        Product product = ensureProductExists(productId);
 
         User user = userService.findById(userId);
         if (user == null) {
@@ -76,7 +83,7 @@ public class ProductQuestionService {
         question.setQuestionText(normalizeQuestionText(questionText));
 
         ProductQuestion savedQuestion = productQuestionRepository.save(question);
-        return mapQuestion(savedQuestion, List.of());
+        return mapQuestion(savedQuestion, List.of(), product.getListedByUserId());
     }
 
     public Map<String, Object> createAnswer(Long productId, Long questionId, Long userId, String answerText) {
@@ -91,13 +98,6 @@ public class ProductQuestionService {
             throw new IllegalArgumentException("User account not found");
         }
 
-        boolean isListingOwner = product.getListedByUserId() != null
-                && product.getListedByUserId().equals(user.getId());
-
-        if (!isListingOwner && !userService.isAdmin(user)) {
-            throw new IllegalStateException("Only the listing owner or admin can answer questions");
-        }
-
         ProductQuestionAnswer answer = new ProductQuestionAnswer();
         answer.setQuestionId(question.getId());
         answer.setAnsweredByUserId(user.getId());
@@ -109,7 +109,69 @@ public class ProductQuestionService {
         List<ProductQuestionAnswer> answers = productQuestionAnswerRepository
                 .findByQuestionIdOrderByCreatedAtAsc(question.getId());
 
-        return mapQuestion(question, answers);
+        return mapQuestion(question, answers, product.getListedByUserId());
+    }
+
+    public Map<String, Object> updateAnswer(
+            Long productId,
+            Long questionId,
+            Long answerId,
+            Long userId,
+            String answerText) {
+        Product product = ensureProductExists(productId);
+
+        ProductQuestion question = productQuestionRepository
+                .findByIdAndProductId(questionId, productId)
+                .orElseThrow(() -> new IllegalArgumentException("Question not found"));
+
+        ProductQuestionAnswer answer = productQuestionAnswerRepository
+                .findByIdAndQuestionId(answerId, questionId)
+                .orElseThrow(() -> new IllegalArgumentException("Answer not found"));
+
+        User user = userService.findById(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("User account not found");
+        }
+
+        if (!canManageAnswer(user, answer.getAnsweredByUserId())) {
+            throw new IllegalStateException("You can edit only your own responses");
+        }
+
+        answer.setAnswerText(normalizeAnswerText(answerText));
+        productQuestionAnswerRepository.save(answer);
+
+        List<ProductQuestionAnswer> answers = productQuestionAnswerRepository
+                .findByQuestionIdOrderByCreatedAtAsc(question.getId());
+
+        return mapQuestion(question, answers, product.getListedByUserId());
+    }
+
+    public Map<String, Object> deleteAnswer(Long productId, Long questionId, Long answerId, Long userId) {
+        Product product = ensureProductExists(productId);
+
+        ProductQuestion question = productQuestionRepository
+                .findByIdAndProductId(questionId, productId)
+                .orElseThrow(() -> new IllegalArgumentException("Question not found"));
+
+        ProductQuestionAnswer answer = productQuestionAnswerRepository
+                .findByIdAndQuestionId(answerId, questionId)
+                .orElseThrow(() -> new IllegalArgumentException("Answer not found"));
+
+        User user = userService.findById(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("User account not found");
+        }
+
+        if (!canManageAnswer(user, answer.getAnsweredByUserId())) {
+            throw new IllegalStateException("You can delete only your own responses");
+        }
+
+        productQuestionAnswerRepository.delete(answer);
+
+        List<ProductQuestionAnswer> answers = productQuestionAnswerRepository
+                .findByQuestionIdOrderByCreatedAtAsc(question.getId());
+
+        return mapQuestion(question, answers, product.getListedByUserId());
     }
 
     private Product ensureProductExists(Long productId) {
@@ -143,6 +205,20 @@ public class ProductQuestionService {
         return normalized;
     }
 
+    private boolean canManageAnswer(User actor, Long answerAuthorUserId) {
+        if (actor == null) {
+            return false;
+        }
+
+        if (userService.isAdmin(actor)) {
+            return true;
+        }
+
+        return actor.getId() != null
+                && answerAuthorUserId != null
+                && actor.getId().equals(answerAuthorUserId);
+    }
+
     private String normalizeSentence(String value) {
         if (value == null) {
             return "";
@@ -172,7 +248,11 @@ public class ProductQuestionService {
         return "Campus User";
     }
 
-    private Map<String, Object> mapQuestion(ProductQuestion question, List<ProductQuestionAnswer> answers) {
+    private Map<String, Object> mapQuestion(
+            ProductQuestion question,
+            List<ProductQuestionAnswer> answers,
+            Long listingOwnerUserId) {
+        Map<Long, String> roleByUserId = new HashMap<>();
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("id", question.getId());
         payload.put("productId", question.getProductId());
@@ -180,18 +260,50 @@ public class ProductQuestionService {
         payload.put("author", question.getAuthorName());
         payload.put("authorUserId", question.getAskedByUserId());
         payload.put("createdAt", question.getCreatedAt());
-        payload.put("answers", answers.stream().map(this::mapAnswer).toList());
+        payload.put(
+                "answers",
+                answers.stream()
+                        .map(answer -> mapAnswer(answer, listingOwnerUserId, roleByUserId))
+                        .toList());
         payload.put("answerCount", answers.size());
         return payload;
     }
 
-    private Map<String, Object> mapAnswer(ProductQuestionAnswer answer) {
+    private Map<String, Object> mapAnswer(
+            ProductQuestionAnswer answer,
+            Long listingOwnerUserId,
+            Map<Long, String> roleByUserId) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("id", answer.getId());
         payload.put("text", answer.getAnswerText());
         payload.put("author", answer.getAuthorName());
         payload.put("authorUserId", answer.getAnsweredByUserId());
+        payload.put("authorRole",
+                resolveAnswerAuthorRole(answer.getAnsweredByUserId(), listingOwnerUserId, roleByUserId));
         payload.put("createdAt", answer.getCreatedAt());
         return payload;
+    }
+
+    private String resolveAnswerAuthorRole(
+            Long answeredByUserId,
+            Long listingOwnerUserId,
+            Map<Long, String> roleByUserId) {
+        if (answeredByUserId == null) {
+            return "COMMUNITY";
+        }
+
+        if (listingOwnerUserId != null && listingOwnerUserId.equals(answeredByUserId)) {
+            return "SELLER";
+        }
+
+        String cachedRole = roleByUserId.get(answeredByUserId);
+        if (cachedRole != null) {
+            return cachedRole;
+        }
+
+        User user = userService.findById(answeredByUserId);
+        String resolvedRole = user != null && userService.isAdmin(user) ? "ADMIN" : "COMMUNITY";
+        roleByUserId.put(answeredByUserId, resolvedRole);
+        return resolvedRole;
     }
 }

@@ -51,6 +51,8 @@ const getInitialWallet = () => {
   return Number.isFinite(value) ? value : 0;
 };
 
+const roundCurrency = (amount) => Math.round(amount * 100) / 100;
+
 const normalizeUser = (user) => ({
   ...buildGuestUser(),
   ...(user || {}),
@@ -87,6 +89,7 @@ export const actionTypes = {
   FETCH_PRODUCTS_START: 'FETCH_PRODUCTS_START',
   FETCH_PRODUCTS_SUCCESS: 'FETCH_PRODUCTS_SUCCESS',
   FETCH_PRODUCTS_FAIL: 'FETCH_PRODUCTS_FAIL',
+  ADD_WALLET_FUNDS: 'ADD_WALLET_FUNDS',
   USE_WALLET_FUNDS: 'USE_WALLET_FUNDS',
   SET_PRIME_MEMBERSHIP: 'SET_PRIME_MEMBERSHIP',
 };
@@ -345,12 +348,21 @@ const globalStateReducer = (state, action) => {
         },
       };
 
+    case actionTypes.ADD_WALLET_FUNDS: {
+      const amount = Number(action.payload);
+      if (!Number.isFinite(amount) || amount <= 0) return state;
+      return {
+        ...state,
+        studentWallet: roundCurrency(state.studentWallet + amount),
+      };
+    }
+
     case actionTypes.USE_WALLET_FUNDS: {
       const amount = Number(action.payload);
       if (!Number.isFinite(amount) || amount <= 0) return state;
       return {
         ...state,
-        studentWallet: Math.max(0, state.studentWallet - amount),
+        studentWallet: roundCurrency(Math.max(0, state.studentWallet - amount)),
       };
     }
 

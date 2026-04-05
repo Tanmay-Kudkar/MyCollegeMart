@@ -103,11 +103,12 @@ public class ProductService {
         return savedProduct;
     }
 
-    public Product updateListing(Long productId, Product updates, Long sellerUserId) {
+    public Product updateListing(Long productId, Product updates, Long actorUserId, boolean hasGlobalEditAccess) {
         Product existing = productRepository.findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found"));
 
-        if (existing.getListedByUserId() == null || !existing.getListedByUserId().equals(sellerUserId)) {
+        boolean isOwner = existing.getListedByUserId() != null && existing.getListedByUserId().equals(actorUserId);
+        if (!hasGlobalEditAccess && !isOwner) {
             throw new IllegalStateException("You can edit only your own listings");
         }
 
@@ -160,12 +161,13 @@ public class ProductService {
     public Product updateListingWithMedia(
             Long productId,
             Product updates,
-            Long sellerUserId,
+            Long actorUserId,
+            boolean hasGlobalEditAccess,
             List<MultipartFile> imageFiles,
             List<MultipartFile> videoFiles) {
         validateMediaCounts(imageFiles, videoFiles);
 
-        Product updatedProduct = updateListing(productId, updates, sellerUserId);
+        Product updatedProduct = updateListing(productId, updates, actorUserId, hasGlobalEditAccess);
 
         if (hasAnyUploadedFiles(imageFiles)) {
             List<MediaAsset> storedImages = mediaAssetService.replaceFiles(

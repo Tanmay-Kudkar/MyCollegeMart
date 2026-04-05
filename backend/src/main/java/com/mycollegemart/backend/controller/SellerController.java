@@ -32,16 +32,18 @@ public class SellerController {
     @GetMapping("/dashboard")
     public ResponseEntity<?> getDashboard(
             @RequestHeader(name = "Authorization", required = false) String authHeader) {
-        User merchant = resolveMerchant(authHeader);
-        if (merchant == null) {
+        User listingManager = resolveListingManager(authHeader);
+        if (listingManager == null) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message", "Verified merchant access is required for seller dashboard"));
+                    .body(Map.of("message", "Verified merchant or admin access is required for seller dashboard"));
         }
 
-        return ResponseEntity.ok(sellerService.getDashboardOverview(merchant.getId()));
+        return ResponseEntity.ok(sellerService.getDashboardOverview(
+                listingManager.getId(),
+                userService.isAdmin(listingManager)));
     }
 
-    private User resolveMerchant(String authHeader) {
+    private User resolveListingManager(String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return null;
         }
@@ -59,7 +61,7 @@ public class SellerController {
         }
 
         User user = userService.findById(parsedUserId);
-        if (user == null || !userService.canManageListings(user)) {
+        if (user == null || (!userService.canManageListings(user) && !userService.isAdmin(user))) {
             return null;
         }
 

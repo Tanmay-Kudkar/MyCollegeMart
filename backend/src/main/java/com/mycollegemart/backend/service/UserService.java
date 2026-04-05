@@ -33,6 +33,12 @@ public class UserService {
     public static final String MERCHANT_STATUS_PENDING = "PENDING";
     public static final String MERCHANT_STATUS_APPROVED = "APPROVED";
     public static final String MERCHANT_STATUS_REJECTED = "REJECTED";
+    private static final int MAX_PROFILE_IMAGE_BYTES = 1024 * 1024;
+    private static final Set<String> ALLOWED_PROFILE_IMAGE_CONTENT_TYPES = Set.of(
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "image/gif");
 
     public enum PasswordAuthFailureReason {
         ACCOUNT_NOT_FOUND,
@@ -333,6 +339,41 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    public User updateProfileImage(Long userId, byte[] imageBytes, String contentType) {
+        User user = findById(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("User not found");
+        }
+
+        if (imageBytes == null || imageBytes.length == 0) {
+            throw new IllegalArgumentException("Please select an image to upload");
+        }
+
+        if (imageBytes.length > MAX_PROFILE_IMAGE_BYTES) {
+            throw new IllegalArgumentException("Profile image must be 1 MB or less");
+        }
+
+        String normalizedContentType = normalizeProfileImageContentType(contentType);
+        if (normalizedContentType == null) {
+            throw new IllegalArgumentException("Only JPG, PNG, WEBP, or GIF images are allowed");
+        }
+
+        user.setProfileImage(Arrays.copyOf(imageBytes, imageBytes.length));
+        user.setProfileImageContentType(normalizedContentType);
+        return userRepository.save(user);
+    }
+
+    public User removeProfileImage(Long userId) {
+        User user = findById(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("User not found");
+        }
+
+        user.setProfileImage(null);
+        user.setProfileImageContentType(null);
+        return userRepository.save(user);
+    }
+
     public boolean isMaster(User user) {
         if (user == null || user.getEmail() == null || masterEmail == null || masterEmail.isBlank()) {
             return false;
@@ -412,7 +453,7 @@ public class UserService {
     }
 
     public boolean canManageListings(User user) {
-        return isMaster(user) || isMerchantVerified(user);
+        return isAdmin(user) || isMerchantVerified(user);
     }
 
     public String normalizeMerchantVerificationStatus(String status) {
@@ -517,6 +558,22 @@ public class UserService {
         return trimmed.isBlank() ? null : trimmed;
     }
 
+    private String normalizeProfileImageContentType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return null;
+        }
+
+        String normalized = contentType.trim().toLowerCase(Locale.ROOT);
+        int separatorIndex = normalized.indexOf(';');
+        if (separatorIndex >= 0) {
+            normalized = normalized.substring(0, separatorIndex).trim();
+        }
+
+        return ALLOWED_PROFILE_IMAGE_CONTENT_TYPES.contains(normalized)
+                ? normalized
+                : null;
+    }
+
     private String extractDisplayName(String email) {
         if (email == null || email.isBlank()) {
             return "Student";
@@ -537,6 +594,7 @@ public class UserService {
         response.put("displayName", merchant.getDisplayName());
         response.put("shopName", merchant.getShopName());
         response.put("shopTagline", merchant.getShopTagline());
+        response.put("shopDescription", merchant.getShopDescription());
         response.put("shopPhone", merchant.getShopPhone());
         response.put("shopCampusLocation", merchant.getShopCampusLocation());
         response.put("merchantVerificationStatus",

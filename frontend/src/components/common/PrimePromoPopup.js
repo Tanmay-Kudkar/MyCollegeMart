@@ -8,21 +8,21 @@ const PrimePromoPopup = ({ onClose, onLearnMore }) => {
       animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
       exit={{ opacity: 0, y: 16, filter: 'blur(2px)' }}
       transition={{ duration: 0.25, ease: 'easeOut' }}
-      className="fixed bottom-5 right-5 w-72 rounded-lg shadow-xl z-50 overflow-hidden transform-gpu will-change-transform"
+      className="fixed z-50 mcm-overlay-card overflow-hidden shadow-xl transform-gpu will-change-transform mcm-safe-bottom-inset mcm-safe-x-inset sm:left-auto sm:w-72 sm:mcm-safe-bottom-inset-lg sm:mcm-safe-right-inset-lg"
     >
       {/* Main container with gradient background */}
       <div className="bg-gradient-to-r from-amber-500 to-yellow-400 p-4 relative">
         {/* animated panel glow */}
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute -inset-2 rounded-xl bg-white/10 blur-xl animate-pulse"
+          className="pointer-events-none absolute -inset-2 mcm-overlay-card bg-white/10 blur-xl animate-pulse"
         />
         {/* Wrapper to ensure content is stacked above the glow */}
         <div className="relative">
           {/* Close button */}
           <button 
             onClick={onClose} 
-            className="absolute -top-2 -right-2 text-slate-800/80 hover:text-slate-900 bg-black/10 hover:bg-black/20 p-1 rounded-full transition-colors"
+            className="absolute right-1 top-1 rounded-full bg-black/10 p-1 text-slate-800/80 transition-colors hover:bg-black/20 hover:text-slate-900"
             aria-label="Close popup"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">

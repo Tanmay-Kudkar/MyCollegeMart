@@ -7,7 +7,9 @@ import jakarta.validation.constraints.NotBlank;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -70,6 +72,57 @@ public class ProductQuestionController {
             return ResponseEntity
                     .ok(productQuestionService.createAnswer(productId, questionId, userId, request.answer()));
         } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PatchMapping("/{questionId}/answers/{answerId}")
+    public ResponseEntity<?> updateAnswer(
+            @PathVariable Long productId,
+            @PathVariable Long questionId,
+            @PathVariable Long answerId,
+            @RequestHeader(name = "Authorization", required = false) String authHeader,
+            @Valid @RequestBody AnswerQuestionRequest request) {
+        Long userId = resolveUserId(authHeader);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Please sign in to edit responses"));
+        }
+
+        try {
+            return ResponseEntity
+                    .ok(productQuestionService.updateAnswer(productId, questionId, answerId, userId, request.answer()));
+        } catch (IllegalArgumentException e) {
+            if ("Answer not found".equalsIgnoreCase(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
+            }
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{questionId}/answers/{answerId}")
+    public ResponseEntity<?> deleteAnswer(
+            @PathVariable Long productId,
+            @PathVariable Long questionId,
+            @PathVariable Long answerId,
+            @RequestHeader(name = "Authorization", required = false) String authHeader) {
+        Long userId = resolveUserId(authHeader);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Please sign in to delete responses"));
+        }
+
+        try {
+            return ResponseEntity
+                    .ok(productQuestionService.deleteAnswer(productId, questionId, answerId, userId));
+        } catch (IllegalArgumentException e) {
+            if ("Answer not found".equalsIgnoreCase(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
+            }
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", e.getMessage()));

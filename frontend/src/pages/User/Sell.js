@@ -317,7 +317,8 @@ const Sell = ({ onNavigate, pageParams = {} }) => {
         const listing = response?.data;
         const ownerId = Number(listing?.listedByUserId);
         const currentUserId = Number(state.user?.id);
-        if (!Number.isFinite(ownerId) || !Number.isFinite(currentUserId) || ownerId !== currentUserId) {
+        const isAdminUser = Boolean(state.user?.isAdmin);
+        if (!isAdminUser && (!Number.isFinite(ownerId) || !Number.isFinite(currentUserId) || ownerId !== currentUserId)) {
           throw new Error('You can edit only your own listing.');
         }
 
@@ -369,7 +370,7 @@ const Sell = ({ onNavigate, pageParams = {} }) => {
     return () => {
       isCancelled = true;
     };
-  }, [isEditMode, editProductId, state.isLoggedIn, state.user?.id]);
+  }, [isEditMode, editProductId, state.isLoggedIn, state.user?.id, state.user?.isAdmin]);
 
   const addSpecField = () => {
     if (availableOptions.length === 0) {
@@ -732,6 +733,8 @@ const Sell = ({ onNavigate, pageParams = {} }) => {
   const INPUT_STYLE = "w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition";
   const isMerchant = (state.user?.accountType || 'INDIVIDUAL').toUpperCase() === 'MERCHANT';
   const canManageListings = Boolean(state.user?.canManageListings);
+  const isAdmin = Boolean(state.user?.isAdmin);
+  const hasSellerAccess = canManageListings || isAdmin;
   const verificationStatus = (state.user?.merchantVerificationStatus || (isMerchant ? 'PENDING' : 'NOT_REQUIRED')).toUpperCase();
 
   if (!state.isLoggedIn) {
@@ -740,7 +743,7 @@ const Sell = ({ onNavigate, pageParams = {} }) => {
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center shadow-sm">
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Sign in required</h1>
           <p className="text-slate-600 dark:text-slate-300 mt-3">
-            Please sign in with a Merchant account to list campus items.
+            Please sign in with a Merchant or Admin account to manage listings.
           </p>
           <button
             onClick={() => onNavigate('Login')}
@@ -753,13 +756,13 @@ const Sell = ({ onNavigate, pageParams = {} }) => {
     );
   }
 
-  if (!isMerchant) {
+  if (!isMerchant && !isAdmin) {
     return (
       <div className="max-w-2xl mx-auto py-16 px-4">
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-8 shadow-sm">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Merchant Access Needed</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Seller Access Needed</h1>
           <p className="text-slate-600 dark:text-slate-300 mt-3">
-            Listing items is limited to student Merchant accounts to keep this marketplace trustworthy and campus-focused.
+            Listing management is available for campus Merchant or Admin accounts.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
@@ -780,7 +783,7 @@ const Sell = ({ onNavigate, pageParams = {} }) => {
     );
   }
 
-  if (!canManageListings) {
+  if (!hasSellerAccess) {
     return (
       <div className="max-w-2xl mx-auto py-16 px-4">
         <div className="bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-700/40 rounded-xl p-8 shadow-sm">

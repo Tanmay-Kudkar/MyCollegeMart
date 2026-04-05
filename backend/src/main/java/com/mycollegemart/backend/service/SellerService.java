@@ -31,8 +31,10 @@ public class SellerService {
         this.productQuestionAnswerRepository = productQuestionAnswerRepository;
     }
 
-    public Map<String, Object> getDashboardOverview(Long sellerUserId) {
-        List<Product> products = productRepository.findByListedByUserIdOrderByCreatedAtDesc(sellerUserId);
+    public Map<String, Object> getDashboardOverview(Long sellerUserId, boolean includeAllListings) {
+        List<Product> products = includeAllListings
+                ? productRepository.findAllByOrderByCreatedAtDesc()
+                : productRepository.findByListedByUserIdOrderByCreatedAtDesc(sellerUserId);
 
         List<Long> productIds = products.stream()
                 .map(Product::getId)
@@ -94,6 +96,7 @@ public class SellerService {
                 .toList();
 
         Map<String, Object> response = new HashMap<>();
+        response.put("scope", includeAllListings ? "ALL" : "OWN");
         response.put("activeListings", activeListings);
         response.put("averageRating", averageRating);
         response.put("estimatedSales", 0);

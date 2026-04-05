@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ai as aiApi } from '../../utils/api';
-import { SendIcon, CloseIcon, ChatIcon } from '../UI/Icons';
+import { MessageCircle, SendHorizontal, Square, X } from 'lucide-react';
 
 const BULLET_PATTERN = /^[-*\u2022]\s+/;
 const NUMBERED_PATTERN = /^\d+[.)]\s+/;
@@ -264,7 +264,7 @@ const AIChatbot = ({ isChatOpen, setIsChatOpen, onNavigate }) => {
       {/* Chat button */}
       <button
         onClick={() => setIsChatOpen(!isChatOpen)}
-        className={`fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-600 text-white shadow-[0_18px_40px_-18px_rgba(37,99,235,0.95)] transition-all duration-300 hover:-translate-y-0.5 hover:from-indigo-500 hover:to-cyan-500 ${
+        className={`fixed z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-600 text-white shadow-[0_18px_40px_-18px_rgba(37,99,235,0.95)] transition-all duration-300 hover:-translate-y-0.5 hover:from-indigo-500 hover:to-cyan-500 mcm-safe-bottom-inset mcm-safe-right-inset sm:mcm-safe-bottom-inset-lg sm:mcm-safe-right-inset-lg ${
           isChatOpen ? 'pointer-events-none scale-75 opacity-0' : 'scale-100 opacity-100'
         }`}
         aria-label="Open chat"
@@ -272,7 +272,7 @@ const AIChatbot = ({ isChatOpen, setIsChatOpen, onNavigate }) => {
       >
         <span className="pointer-events-none absolute -inset-1 rounded-3xl bg-indigo-500/40 blur-lg" />
         <span className="relative">
-          <ChatIcon />
+          <MessageCircle className="h-6 w-6" />
         </span>
       </button>
 
@@ -284,7 +284,7 @@ const AIChatbot = ({ isChatOpen, setIsChatOpen, onNavigate }) => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 14, scale: 0.95 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="mcm-chatbot fixed bottom-3 right-3 z-40 flex h-[min(78vh,36rem)] w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-[0_30px_80px_-35px_rgba(49,46,129,0.88)] backdrop-blur-xl dark:border-slate-700/80 dark:bg-slate-900/95 sm:bottom-5 sm:right-5 sm:w-[24rem] md:w-[26rem]"
+            className="mcm-chatbot fixed z-40 flex h-[min(78vh,36rem)] w-auto flex-col overflow-hidden rounded-2xl border-2 border-slate-300 bg-white/95 shadow-[0_30px_80px_-35px_rgba(49,46,129,0.88)] backdrop-blur-xl dark:border-slate-700/80 dark:bg-slate-900/95 mcm-safe-bottom-inset mcm-safe-x-inset sm:left-auto sm:w-[24rem] sm:rounded-3xl sm:mcm-safe-bottom-inset-lg sm:mcm-safe-right-inset-lg md:w-[26rem]"
           >
             {/* Chat header */}
             <div className="relative flex items-center justify-between bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-500 px-4 py-3.5 text-white">
@@ -304,12 +304,12 @@ const AIChatbot = ({ isChatOpen, setIsChatOpen, onNavigate }) => {
                 aria-label="Close chat"
                 title="Close Chat"
               >
-                <CloseIcon className="w-5 h-5" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
             {/* Chat messages */}
-            <div className="mcm-chat-scroll flex-grow space-y-4 overflow-y-auto bg-gradient-to-b from-slate-50/75 via-slate-100/35 to-white/75 px-3 py-4 dark:from-slate-900 dark:via-slate-900/80 dark:to-slate-800/70 sm:px-4">
+            <div className="mcm-chat-scroll flex-grow space-y-4 overflow-y-auto bg-gradient-to-b from-slate-100/95 via-slate-100/80 to-slate-50/95 px-3 py-4 dark:from-slate-900 dark:via-slate-900/80 dark:to-slate-800/70 sm:px-4">
               {messages.map((msg, i) => {
                 const isUser = msg.role === 'user';
 
@@ -326,8 +326,8 @@ const AIChatbot = ({ isChatOpen, setIsChatOpen, onNavigate }) => {
                         <span
                           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold uppercase tracking-wide ${
                             isUser
-                              ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
-                              : 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/35 dark:text-cyan-300'
+                              ? 'bg-indigo-200 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300'
+                              : 'bg-cyan-200 text-cyan-800 dark:bg-cyan-900/35 dark:text-cyan-300'
                           }`}
                         >
                           {isUser ? 'U' : 'AI'}
@@ -335,14 +335,14 @@ const AIChatbot = ({ isChatOpen, setIsChatOpen, onNavigate }) => {
                         <div
                           className={`rounded-2xl px-3 py-2.5 shadow-sm ring-1 ${
                             isUser
-                              ? 'rounded-br-md bg-gradient-to-br from-indigo-600 to-blue-600 text-white ring-indigo-400/30'
-                              : 'rounded-bl-md bg-white text-slate-800 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700'
+                              ? 'rounded-br-md bg-gradient-to-br from-indigo-600 to-blue-600 text-white ring-indigo-700/35'
+                              : 'rounded-bl-md bg-white text-slate-900 ring-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700'
                           }`}
                         >
                           {renderMessageContent(msg)}
                         </div>
                       </div>
-                      <span className={`text-[11px] text-slate-400 dark:text-slate-500 ${isUser ? 'pr-9' : 'pl-9'}`}>
+                      <span className={`text-[11px] text-slate-500 dark:text-slate-500 ${isUser ? 'pr-9' : 'pl-9'}`}>
                         {msg.time}
                       </span>
                     </div>
@@ -353,10 +353,10 @@ const AIChatbot = ({ isChatOpen, setIsChatOpen, onNavigate }) => {
               {isTyping && (
                 <div className="flex justify-start">
                   <div className="flex items-end gap-2">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-100 text-[10px] font-semibold uppercase tracking-wide text-cyan-700 dark:bg-cyan-900/35 dark:text-cyan-300">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-200 text-[10px] font-semibold uppercase tracking-wide text-cyan-800 dark:bg-cyan-900/35 dark:text-cyan-300">
                       AI
                     </span>
-                    <div className="rounded-2xl rounded-bl-md bg-white px-3 py-2.5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
+                    <div className="rounded-2xl rounded-bl-md bg-white px-3 py-2.5 shadow-sm ring-1 ring-slate-300 dark:bg-slate-800 dark:ring-slate-700">
                       <div className="flex items-center gap-1.5">
                         <span className="mcm-chat-dot h-2 w-2 rounded-full bg-indigo-500 dark:bg-indigo-300" />
                         <span className="mcm-chat-dot h-2 w-2 rounded-full bg-indigo-500 dark:bg-indigo-300" />
@@ -370,13 +370,13 @@ const AIChatbot = ({ isChatOpen, setIsChatOpen, onNavigate }) => {
             </div>
 
             {/* Quick buttons */}
-            <div className="border-t border-slate-200/70 bg-white/90 px-3 pb-2 pt-2 dark:border-slate-700/70 dark:bg-slate-900/90">
+            <div className="border-t border-slate-300 bg-slate-50/90 px-3 pb-2 pt-2 dark:border-slate-700/70 dark:bg-slate-900/90">
               <div className="mcm-chat-scroll flex gap-2 overflow-x-auto pb-1">
                 {QUICK_ACTIONS.map((action) => (
                   <button
                     key={action.prompt}
                     onClick={() => sendMessage(action.prompt)}
-                    className="whitespace-nowrap rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200 dark:hover:bg-indigo-500/20"
+                    className="whitespace-nowrap rounded-full border border-indigo-300 bg-indigo-100 px-3 py-1.5 text-xs font-medium text-indigo-800 transition-colors hover:bg-indigo-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200 dark:hover:bg-indigo-500/20"
                     title={`Quick action: ${action.label}`}
                     disabled={isTyping}
                   >
@@ -387,14 +387,14 @@ const AIChatbot = ({ isChatOpen, setIsChatOpen, onNavigate }) => {
             </div>
 
             {/* Chat input */}
-            <form onSubmit={handleSendMessage} className="border-t border-slate-200/80 bg-white/95 p-3 dark:border-slate-700/80 dark:bg-slate-900/95">
-              <div className="flex h-12 items-center rounded-2xl border border-slate-300/80 bg-slate-50 shadow-inner dark:border-slate-600/80 dark:bg-slate-800/80">
+            <form onSubmit={handleSendMessage} className="border-t border-slate-300 bg-slate-50/95 p-3 dark:border-slate-700/80 dark:bg-slate-900/95">
+              <div className="flex h-12 items-center rounded-2xl border border-slate-400 bg-white shadow-inner dark:border-slate-600/80 dark:bg-slate-800/80">
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Type a message..."
-                  className="h-full min-w-0 flex-grow bg-transparent px-4 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-slate-100"
+                  className="h-full min-w-0 flex-grow bg-transparent px-4 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none dark:text-slate-100"
                   disabled={isTyping}
                 />
                 <button
@@ -407,11 +407,11 @@ const AIChatbot = ({ isChatOpen, setIsChatOpen, onNavigate }) => {
                 >
                   {isTyping ? (
                     <span className="flex h-6 w-6 items-center justify-center">
-                      <span className="block h-3.5 w-3.5 rounded-sm bg-white" />
+                      <Square className="h-3.5 w-3.5 fill-current stroke-current" />
                     </span>
                   ) : (
                     <span className="flex h-6 w-6 items-center justify-center">
-                      <SendIcon />
+                      <SendHorizontal className="h-4 w-4" />
                     </span>
                   )}
                 </button>

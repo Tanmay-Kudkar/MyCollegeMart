@@ -2,10 +2,12 @@ package com.mycollegemart.backend.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
@@ -33,6 +36,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -310,6 +314,47 @@ public class AuthController {
         }
     }
 
+    @PostMapping(value = "/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadProfileImage(
+            @RequestHeader(name = "Authorization", required = false) String authHeader,
+            @RequestParam(name = "image", required = false) MultipartFile image) {
+        Long userId = resolveUserId(authHeader);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Please sign in"));
+        }
+
+        if (image == null || image.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Please select an image to upload"));
+        }
+
+        try {
+            User updatedUser = userService.updateProfileImage(userId, image.getBytes(), image.getContentType());
+            return ResponseEntity.ok(buildUserResponse(updatedUser));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (IOException e) {
+            logger.error("Failed to upload profile image. Cause: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Failed to upload profile image"));
+        }
+    }
+
+    @DeleteMapping("/profile-image")
+    public ResponseEntity<?> removeProfileImage(
+            @RequestHeader(name = "Authorization", required = false) String authHeader) {
+        Long userId = resolveUserId(authHeader);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Please sign in"));
+        }
+
+        try {
+            User updatedUser = userService.removeProfileImage(userId);
+            return ResponseEntity.ok(buildUserResponse(updatedUser));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     private Long resolveUserId(String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return null;
@@ -403,8 +448,22 @@ public class AuthController {
         response.put("shopDescription", user.getShopDescription());
         response.put("shopPhone", user.getShopPhone());
         response.put("shopCampusLocation", user.getShopCampusLocation());
+        response.put("profileImageDataUrl", buildProfileImageDataUrl(user));
         response.put("wishlistProductIds", user.getWishlistProductIds());
         return response;
+    }
+
+    private String buildProfileImageDataUrl(User user) {
+        if (user == null || user.getProfileImage() == null || user.getProfileImage().length == 0) {
+            return null;
+        }
+
+        String contentType = user.getProfileImageContentType();
+        if (contentType == null || contentType.isBlank()) {
+            contentType = MediaType.IMAGE_JPEG_VALUE;
+        }
+
+        return "data:" + contentType + ";base64," + Base64.getEncoder().encodeToString(user.getProfileImage());
     }
 
     private record AuthRequest(

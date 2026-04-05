@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { seller } from '../../utils/api';
 import { useGlobalState } from '../../context/GlobalStateContext';
+import PrimeJoinBanner from '../../components/common/PrimeJoinBanner';
+
+const SELLER_DASHBOARD_FETCH_TIMEOUT_MS = 4000;
+const SELLER_DASHBOARD_RETRY_MS = 1000;
 
 const SellerDashboard = ({ onNavigate }) => {
   const { state } = useGlobalState();
@@ -9,33 +13,82 @@ const SellerDashboard = ({ onNavigate }) => {
 
   const isMerchant = (state.user?.accountType || 'INDIVIDUAL').toUpperCase() === 'MERCHANT';
   const canManageListings = Boolean(state.user?.canManageListings);
+  const isAdmin = Boolean(state.user?.isAdmin);
+  const hasSellerAccess = canManageListings || isAdmin;
   const verificationStatus = (state.user?.merchantVerificationStatus || (isMerchant ? 'PENDING' : 'NOT_REQUIRED')).toUpperCase();
 
   useEffect(() => {
-    if (!state.isLoggedIn || !isMerchant || !canManageListings) {
+    let isCancelled = false;
+
+    if (!state.isLoggedIn || (!isMerchant && !isAdmin) || !hasSellerAccess) {
       setStatus('idle');
       return;
     }
 
-    seller.getDashboard()
+    setStatus('loading');
+
+    seller.getDashboard({ timeout: SELLER_DASHBOARD_FETCH_TIMEOUT_MS })
       .then((response) => {
-        setDashboard(response.data || null);
-        setStatus('succeeded');
+        if (!isCancelled) {
+          setDashboard(response.data || null);
+          setStatus('succeeded');
+        }
       })
       .catch(() => {
-        setStatus('failed');
+        if (!isCancelled) {
+          setStatus('failed');
+        }
       });
-  }, [state.isLoggedIn, isMerchant, canManageListings]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [state.isLoggedIn, isMerchant, isAdmin, hasSellerAccess]);
+
+  useEffect(() => {
+    if (status !== 'failed' || !state.isLoggedIn || (!isMerchant && !isAdmin) || !hasSellerAccess || typeof window === 'undefined') {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const attemptReloadDashboard = () => {
+      seller.getDashboard({ timeout: SELLER_DASHBOARD_FETCH_TIMEOUT_MS })
+        .then((response) => {
+          if (!isCancelled) {
+            setDashboard(response.data || null);
+            setStatus('succeeded');
+          }
+        })
+        .catch(() => {
+          // Keep retrying until backend responds.
+        });
+    };
+
+    attemptReloadDashboard();
+    const retryInterval = window.setInterval(attemptReloadDashboard, SELLER_DASHBOARD_RETRY_MS);
+    window.addEventListener('online', attemptReloadDashboard);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(retryInterval);
+      window.removeEventListener('online', attemptReloadDashboard);
+    };
+  }, [status, state.isLoggedIn, isMerchant, isAdmin, hasSellerAccess]);
 
   const listings = useMemo(() => {
     const allListings = Array.isArray(dashboard?.recentListings) ? dashboard.recentListings : [];
+    if (isAdmin) {
+      return allListings;
+    }
+
     const currentUserId = Number(state.user?.id);
     if (!Number.isFinite(currentUserId)) {
       return [];
     }
 
     return allListings.filter((item) => Number(item?.listedByUserId) === currentUserId);
-  }, [dashboard, state.user?.id]);
+  }, [dashboard, isAdmin, state.user?.id]);
 
   const activeListingsCount = useMemo(() => {
     const fromApi = Number(dashboard?.activeListings);
@@ -63,12 +116,12 @@ const SellerDashboard = ({ onNavigate }) => {
     );
   }
 
-  if (!isMerchant) {
+  if (!isMerchant && !isAdmin) {
     return (
       <div className="py-12 text-center">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Merchant access required</h2>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Seller access required</h2>
         <p className="mt-2 text-slate-600 dark:text-slate-300">
-          Seller dashboard is available only for campus Merchant accounts.
+          Seller dashboard is available for Merchant or Admin accounts.
         </p>
         <button
           onClick={() => onNavigate?.('Sell')}
@@ -80,7 +133,7 @@ const SellerDashboard = ({ onNavigate }) => {
     );
   }
 
-  if (!canManageListings) {
+  if (!hasSellerAccess) {
     return (
       <div className="py-12 text-center">
         <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Verification pending</h2>
@@ -102,12 +155,18 @@ const SellerDashboard = ({ onNavigate }) => {
   }
 
   if (status === 'failed') {
-    return <div className="py-12 text-center text-rose-500">Failed to load dashboard data.</div>;
+    return <div className="py-12 text-center text-amber-700 dark:text-amber-300">Reconnecting to the server. Seller dashboard will update automatically.</div>;
   }
 
   return (
     <div className="max-w-5xl mx-auto py-8 px-4">
       <h1 className="text-4xl font-extrabold text-slate-900 dark:text-white">Seller Dashboard</h1>
+
+      {!isAdmin && !state.user?.isPrimeMember && (
+        <div className="mt-6">
+          <PrimeJoinBanner onNavigate={onNavigate} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mt-8">
         <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-center shadow-sm">
@@ -131,7 +190,7 @@ const SellerDashboard = ({ onNavigate }) => {
       </div>
 
       <div className="mt-10 mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">My Listings</h2>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{isAdmin ? 'All Listings' : 'My Listings'}</h2>
         <button
           type="button"
           onClick={() => onNavigate?.('Sell')}
@@ -143,7 +202,7 @@ const SellerDashboard = ({ onNavigate }) => {
 
       {listings.length === 0 ? (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
-          <p className="text-slate-600 dark:text-slate-300">No listings available yet.</p>
+          <p className="text-slate-600 dark:text-slate-300">{isAdmin ? 'No listings found yet.' : 'No listings available yet.'}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -170,6 +229,11 @@ const SellerDashboard = ({ onNavigate }) => {
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                 Q&amp;A: {Number(item.openQuestionCount || 0)} open / {Number(item.totalQuestionCount || 0)} total
               </p>
+              {isAdmin && (
+                <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Listed by user ID: {item.listedByUserId ?? 'Unknown'}
+                </p>
+              )}
               <p className={`mt-2 text-xs font-semibold ${item.inStock === false ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                 {item.inStock === false
                   ? 'Out of stock'

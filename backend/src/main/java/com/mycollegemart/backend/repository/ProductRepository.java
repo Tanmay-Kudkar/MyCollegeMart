@@ -8,6 +8,8 @@ import java.util.List;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
+    List<Product> findAllByOrderByCreatedAtDesc();
+
     List<Product> findByListedByUserIdOrderByCreatedAtDesc(Long listedByUserId);
 
     long countByListedByUserId(Long listedByUserId);

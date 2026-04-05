@@ -1,20 +1,123 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
+import { primeMembership as primeMembershipApi } from '../../utils/api';
+
+const DEFAULT_CONFIG = {
+  currency: 'INR',
+  primeMembershipYearlyPrice: 299,
+  assignmentPricing: {
+    Standard: {
+      label: 'Standard Deadline (7 days)',
+      eta: 'Balanced turnaround',
+      regularPrice: 149,
+      primePrice: 99,
+    },
+    Express: {
+      label: 'Express Deadline (3 days)',
+      eta: 'Priority queue delivery',
+      regularPrice: 249,
+      primePrice: 149,
+    },
+    Urgent: {
+      label: 'Urgent Deadline (24 hours)',
+      eta: 'Fast-track support',
+      regularPrice: 399,
+      primePrice: 249,
+    },
+  },
+};
+
+const normalizeTier = (tierPayload, fallbackTier) => {
+  const regularPrice = Number(tierPayload?.regularPrice);
+  const primePrice = Number(tierPayload?.primePrice);
+
+  return {
+    label: tierPayload?.label || fallbackTier.label,
+    eta: tierPayload?.eta || fallbackTier.eta,
+    regularPrice: Number.isFinite(regularPrice) && regularPrice > 0
+      ? regularPrice
+      : fallbackTier.regularPrice,
+    primePrice: Number.isFinite(primePrice) && primePrice > 0
+      ? primePrice
+      : fallbackTier.primePrice,
+  };
+};
+
+const normalizeConfig = (payload) => ({
+  currency: payload?.currency || DEFAULT_CONFIG.currency,
+  primeMembershipYearlyPrice: Number.isFinite(Number(payload?.primeMembershipYearlyPrice))
+    ? Number(payload.primeMembershipYearlyPrice)
+    : DEFAULT_CONFIG.primeMembershipYearlyPrice,
+  assignmentPricing: {
+    Standard: normalizeTier(payload?.assignmentPricing?.Standard, DEFAULT_CONFIG.assignmentPricing.Standard),
+    Express: normalizeTier(payload?.assignmentPricing?.Express, DEFAULT_CONFIG.assignmentPricing.Express),
+    Urgent: normalizeTier(payload?.assignmentPricing?.Urgent, DEFAULT_CONFIG.assignmentPricing.Urgent),
+  },
+});
+
+const formatCurrency = (value, currency = 'INR') => (
+  new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0))
+);
 
 const PrimeMembership = ({ onNavigate }) => {
   const { state, dispatch } = useGlobalState();
   const [showExtraFeatures, setShowExtraFeatures] = useState(false);
-  
-  const primeProduct = {
+  const [config, setConfig] = useState(DEFAULT_CONFIG);
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
+
+  const isMasterAdmin = Boolean(state.user?.isMaster);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadConfig = async () => {
+      setIsLoadingConfig(true);
+      try {
+        const response = await primeMembershipApi.getConfig();
+        if (cancelled) {
+          return;
+        }
+
+        const normalizedConfig = normalizeConfig(response?.data);
+        setConfig(normalizedConfig);
+      } catch {
+        if (!cancelled) {
+          setConfig(DEFAULT_CONFIG);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingConfig(false);
+        }
+      }
+    };
+
+    loadConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const assignmentRows = useMemo(() => ([
+    { key: 'Standard', ...config.assignmentPricing.Standard },
+    { key: 'Express', ...config.assignmentPricing.Express },
+    { key: 'Urgent', ...config.assignmentPricing.Urgent },
+  ]), [config.assignmentPricing]);
+
+  const primeProduct = useMemo(() => ({
     id: 'prime-membership',
     name: 'MyCollegeMart Prime Membership',
-    price: 299,
+    price: config.primeMembershipYearlyPrice,
     description: 'Annual subscription for exclusive benefits and features.',
-    imageUrl: 'https://placehold.co/300x300/f0abfc/1e1b4b?text=Prime',
+    imageUrl: 'https://placehold.co/300x300/fde68a/1f2937?text=Prime',
     category: 'Membership',
-    isPrime: true
-  };
+    isPrime: true,
+  }), [config.primeMembershipYearlyPrice]);
 
   const handleAddToCart = () => {
     if (state.cart?.items?.['prime-membership']) {
@@ -27,182 +130,181 @@ const PrimeMembership = ({ onNavigate }) => {
     dispatch({ type: actionTypes.ADD_TO_CART, payload: primeProduct });
     dispatch({
       type: actionTypes.ADD_NOTIFICATION,
-      payload: { message: 'Prime Membership added to cart!', type: 'success' }
+      payload: {
+        message: `Prime Membership added to cart at ${formatCurrency(config.primeMembershipYearlyPrice, config.currency)}!`,
+        type: 'success',
+      }
     });
   };
 
   const FeatureCard = ({ title, children, icon }) => (
     <motion.div
       whileHover={{ y: -5, boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }}
-      className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 h-full"
+      className="h-full rounded-2xl border border-slate-300 bg-white p-6 shadow-md dark:border-slate-700 dark:bg-slate-800/60"
     >
       <div className="flex items-center gap-3 mb-3">
-        <span className="text-2xl">{icon}</span>
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-900 text-lg text-white dark:bg-slate-700">{icon}</span>
         <h3 className="text-xl font-semibold text-slate-900 dark:text-white">{title}</h3>
       </div>
-      <p className="text-slate-600 dark:text-slate-400">{children}</p>
+      <p className="text-slate-700 dark:text-slate-300">{children}</p>
     </motion.div>
   );
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900 py-12">
-      <div className="max-w-6xl mx-auto">
-        {/* Header section with new gradient and layout */}
-        <div className="relative bg-gradient-to-br from-indigo-900 via-fuchsia-900 to-slate-900 px-8 py-16 rounded-2xl overflow-hidden text-center">
-          <div 
-            className="absolute inset-0" 
-            style={{ 
-              backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path fill='%23a855f7' opacity='0.05' d='M0 50L50 0L100 50L50 100z'/></svg>")`,
-              backgroundSize: '20px 20px' 
-            }}
-          ></div>
-          
-          {/* left-to-right sweep glow animation */}
-          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg z-10" aria-hidden="true">
-            <span
-              className="absolute top-0 bottom-0 left-0 w-full"
-              style={{
-                background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0) 100%)',
-                filter: 'blur(8px)',
-                animation: 'bannerSweep 3s linear infinite'
-              }}
-            />
+    <div className="min-h-screen bg-gradient-to-b from-slate-100 via-white to-slate-100 py-6 sm:py-10 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950">
+      <div className="mx-auto w-full max-w-6xl space-y-8 px-4 sm:px-6 lg:px-8">
+        <motion.section
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative overflow-hidden rounded-3xl border border-slate-300 bg-slate-900 px-5 py-10 text-white shadow-xl sm:px-8 sm:py-12"
+        >
+          <div
+            className="pointer-events-none absolute -inset-y-10 -left-1/3 w-1/2 rotate-12 bg-gradient-to-r from-white/0 via-white/20 to-white/0"
+            style={{ animation: 'mcm-banner-shimmer 4.6s linear infinite' }}
+          />
+          <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+            <div className="absolute -left-12 top-0 h-44 w-44 rounded-full bg-amber-400/35 blur-3xl" />
+            <div className="absolute bottom-0 right-0 h-56 w-56 rounded-full bg-cyan-400/20 blur-3xl" />
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="relative z-10"
-          >
-            <h1 className="text-5xl md:text-6xl font-extrabold text-white drop-shadow-lg">MyCollegeMart Prime</h1>
-            <p className="mt-4 text-lg text-white/80 max-w-2xl mx-auto">Unlock exclusive benefits designed for engineering students.</p>
-            <div className="mt-8">
-              <motion.button 
-                onClick={handleAddToCart}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-10 py-4 bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white font-bold rounded-full transition-all shadow-2xl"
-                title="Add Prime Membership to your cart"
-              >
-                Join Prime — ₹299/year
-              </motion.button>
-            </div>
-          </motion.div>
-        </div>
+          <div className="relative z-10 text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200">Premium Student Benefits</p>
+            <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">MyCollegeMart Prime</h1>
+            <p className="mx-auto mt-3 max-w-3xl text-sm text-slate-100 sm:text-lg">
+              Unlock fast delivery, priority support, and special rates for assignment services.
+            </p>
 
-        {/* Main content */}
-        <div className="p-4 md:p-8 space-y-12">
-          {/* Core benefits */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <FeatureCard icon="🚚" title="Free Campus Delivery">Get your items delivered to your hostel or campus pickup points for free.</FeatureCard>
-            <FeatureCard icon="⏳" title="Early Access">Get a 24-hour head start on newly listed textbooks and popular items.</FeatureCard>
-            <FeatureCard icon="💰" title="Exclusive Deals">Special discounts on stationery, gadgets, and premium listings.</FeatureCard>
-          </div>
-
-          {/* Expandable section for additional features */}
-          <div>
-            <button 
-              onClick={() => setShowExtraFeatures(!showExtraFeatures)}
-              className="w-full py-5 text-left flex justify-between items-center bg-slate-100 dark:bg-slate-800 rounded-xl px-6 hover:bg-slate-200 dark:hover:bg-slate-700/70 text-slate-900 dark:text-white transition-all"
-              title={showExtraFeatures ? 'Hide extra features' : 'Show more Prime features'}
+            <motion.button
+              onClick={handleAddToCart}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.98 }}
+              className="mt-7 rounded-xl bg-amber-400 px-6 py-3 text-base font-extrabold text-slate-900 shadow-lg transition hover:bg-amber-300 sm:px-10 sm:py-4 sm:text-lg"
+              title="Add Prime Membership to your cart"
             >
-              <span className="text-xl font-semibold">Explore More Prime Features</span>
-              <motion.span animate={{ rotate: showExtraFeatures ? 45 : 0 }} className="text-2xl font-light">+</motion.span>
-            </button>
-            
-            {showExtraFeatures && (
-              <motion.div 
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                transition={{ duration: 0.35, ease: "easeOut" }}
-                className="mt-6 space-y-6 overflow-hidden"
-              >
-                <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-xl">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-xl font-semibold mb-2">Assignment & Practical Help</h3>
-                      <p className="text-slate-600 dark:text-slate-400">Get expert help with assignments and practicals at special Prime member rates.</p>
-                    </div>
-                    <span className="text-fuchsia-500 dark:text-fuchsia-400 font-semibold whitespace-nowrap ml-4">PRIME BENEFIT</span>
-                  </div>
-                  
-                  <div className="mt-4 space-y-3 border-t border-slate-200 dark:border-slate-700 pt-4">
-                    <div className="flex justify-between items-center">
-                      <span>Standard Deadline (7 days)</span>
-                      <div className="text-right">
-                        <span className="font-semibold">₹99</span>
-                        <span className="text-xs text-slate-500 line-through ml-2">₹149</span>
-                        <span className="text-xs text-green-500 ml-2">Save ₹50</span>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>Express Deadline (3 days)</span>
-                      <div className="text-right">
-                        <span className="font-semibold">₹149</span>
-                        <span className="text-xs text-slate-500 line-through ml-2">₹249</span>
-                        <span className="text-xs text-green-500 ml-2">Save ₹100</span>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>Urgent Deadline (24 hours)</span>
-                      <div className="text-right">
-                        <span className="font-semibold">₹249</span>
-                        <span className="text-xs text-slate-500 line-through ml-2">₹399</span>
-                        <span className="text-xs text-green-500 ml-2">Save ₹150</span>
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => onNavigate('AssignmentHelp')}
-                    className="mt-4 w-full py-2 bg-fuchsia-600 text-white font-semibold rounded-lg hover:bg-fuchsia-700 transition"
-                  >
-                    Request Assignment Help
-                  </button>
-                </div>
-                
-                <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-xl">
-                  <h3 className="text-xl font-semibold mb-2 text-slate-900 dark:text-white">Exclusive Access to Premium Listings</h3>
-                  <p className="text-slate-600 dark:text-slate-400">Some high-demand items are exclusively available to Prime members.</p>
-                </div>
-                
-                <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-xl">
-                  <h3 className="text-xl font-semibold mb-2 text-slate-900 dark:text-white">Priority Support</h3>
-                  <p className="text-slate-600 dark:text-slate-400">Get faster responses to your questions and support requests.</p>
-                </div>
-              </motion.div>
-            )}
+              Join Prime - {isLoadingConfig ? 'Loading price...' : `${formatCurrency(config.primeMembershipYearlyPrice, config.currency)}/year`}
+            </motion.button>
           </div>
+        </motion.section>
 
-          {/* FAQ section */}
-          <div className="border-t border-slate-200 dark:border-slate-700 pt-12">
-            <h2 className="text-3xl font-bold mb-8 text-center text-slate-900 dark:text-white">Frequently Asked Questions</h2>
-            
-            <div className="max-w-3xl mx-auto space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">How do I get started?</h3>
-                <p className="text-slate-600 dark:text-slate-400 mt-1">Simply add the membership to your cart and checkout. Your membership benefits will be activated immediately after payment.</p>
+        {isMasterAdmin && (
+          <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4 dark:border-cyan-700/40 dark:bg-cyan-900/20">
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">Pricing updates moved to Admin Merchant Panel.</p>
+            <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">Edit all Prime and Assignment rates from one master-only location.</p>
+            <button
+              type="button"
+              onClick={() => onNavigate('AdminMerchantPanel')}
+              className="mt-3 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            >
+              Open Admin Panel
+            </button>
+          </div>
+        )}
+
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <FeatureCard icon="D" title="Free Campus Delivery">
+            Get your items delivered to hostel and pickup points without extra delivery charges.
+          </FeatureCard>
+          <FeatureCard icon="E" title="Early Access">
+            View high-demand listings earlier than non-Prime users and lock your item faster.
+          </FeatureCard>
+          <FeatureCard icon="S" title="Special Deals">
+            Access Prime-exclusive discounts across study tools, accessories, and premium listings.
+          </FeatureCard>
+        </section>
+
+        <section>
+          <button
+            onClick={() => setShowExtraFeatures((prev) => !prev)}
+            className="flex w-full items-center justify-between rounded-2xl border border-slate-300 bg-white px-5 py-4 text-left text-slate-900 shadow-sm transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
+            title={showExtraFeatures ? 'Hide extra features' : 'Show more Prime features'}
+          >
+            <span className="text-lg font-bold sm:text-2xl">Explore More Prime Features</span>
+            <motion.span animate={{ rotate: showExtraFeatures ? 45 : 0 }} className="text-3xl leading-none">+</motion.span>
+          </button>
+
+          {showExtraFeatures && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-5 space-y-5"
+            >
+              <div className="rounded-2xl border border-slate-300 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white">Assignment and Practical Help</h3>
+                    <p className="mt-1 text-slate-700 dark:text-slate-300">Prime members get discounted service rates for every deadline.</p>
+                  </div>
+                  <span className="inline-flex rounded-full border border-cyan-500 bg-cyan-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300">
+                    Prime Benefit
+                  </span>
+                </div>
+
+                <div className="mt-4 space-y-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+                  {assignmentRows.map((row) => {
+                    const savings = Math.max(0, row.regularPrice - row.primePrice);
+
+                    return (
+                      <div key={row.key} className="flex flex-col gap-2 rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 dark:border-slate-600 dark:bg-slate-900/50 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-base font-semibold text-slate-900 dark:text-slate-100">{row.label}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400">{row.eta}</p>
+                        </div>
+
+                        <div className="text-left sm:text-right">
+                          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                            <span className="text-xl font-extrabold text-slate-900 dark:text-white">{formatCurrency(row.primePrice, config.currency)}</span>
+                            <span className="text-sm text-slate-500 line-through dark:text-slate-400">{formatCurrency(row.regularPrice, config.currency)}</span>
+                            <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Save {formatCurrency(savings, config.currency)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={() => onNavigate('AssignmentHelp')}
+                  className="mt-4 w-full rounded-lg bg-slate-900 py-3 font-bold text-white transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                >
+                  Request Assignment Help
+                </button>
               </div>
-              
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">How will I know if I'm a Prime member?</h3>
-                <p className="text-slate-600 dark:text-slate-400 mt-1">Your account page will display a special golden theme indicating your Prime status.</p>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-300 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">Prime-Only Listings</h3>
+                  <p className="mt-2 text-slate-700 dark:text-slate-300">Access select high-demand listings before general marketplace users.</p>
+                </div>
+                <div className="rounded-2xl border border-slate-300 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">Priority Support</h3>
+                  <p className="mt-2 text-slate-700 dark:text-slate-300">Get faster responses for listing disputes, payment help, and account issues.</p>
+                </div>
               </div>
-              
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">What payment methods are accepted?</h3>
-                <p className="text-slate-600 dark:text-slate-400 mt-1">We accept online payments through RazorPay and also offer Cash on Delivery options for physical goods.</p>
-              </div>
+            </motion.div>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-slate-300 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800/70 sm:p-8">
+          <h2 className="text-center text-3xl font-black tracking-tight text-slate-900 dark:text-white">Frequently Asked Questions</h2>
+
+          <div className="mx-auto mt-7 grid max-w-4xl grid-cols-1 gap-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/60">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">How do I get started?</h3>
+              <p className="mt-1 text-slate-700 dark:text-slate-300">Add Prime membership to cart and complete checkout. Benefits activate after successful payment.</p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/60">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">How do I confirm Prime status?</h3>
+              <p className="mt-1 text-slate-700 dark:text-slate-300">Your account page shows active Prime status and expiry date once payment is verified.</p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/60">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">What payment methods are accepted?</h3>
+              <p className="mt-1 text-slate-700 dark:text-slate-300">Prime activation is online payment only via Razorpay for immediate membership activation.</p>
             </div>
           </div>
-        </div>
+        </section>
       </div>
-      <style>{`
-        @keyframes bannerSweep {
-          0%   { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-      `}</style>
     </div>
   );
 };

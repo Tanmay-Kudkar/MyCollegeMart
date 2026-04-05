@@ -32,6 +32,11 @@ const CartDrawer = ({ isOpen, onClose, onNavigate }) => {
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         onClick={(e) => e.stopPropagation()}
         className="fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-slate-800 shadow-2xl flex flex-col"
+        style={{
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingRight: 'env(safe-area-inset-right)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}
       >
         <div className="flex justify-between items-center p-4 border-b dark:border-slate-700">
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Your Cart</h2>

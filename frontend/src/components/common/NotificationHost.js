@@ -19,11 +19,11 @@ const Notification = ({ message, type, onDismiss }) => {
       initial={{ opacity: 0, y: 50, scale: 0.3 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
-      className={`p-4 mb-4 rounded-lg shadow-lg border-l-4 ${borderColor} ${bgColor} ${textColor} flex justify-between items-center`}
+      className={`pointer-events-auto mcm-overlay-card mb-3 flex w-full items-start gap-3 border-l-4 p-4 shadow-lg ${borderColor} ${bgColor} ${textColor}`}
     >
-      <span className="break-words">{message}</span>
-      <button onClick={onDismiss} className="ml-4 p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/10">
-        <CloseIcon />
+      <span className="min-w-0 flex-1 break-words text-sm leading-5">{message}</span>
+      <button onClick={onDismiss} className="shrink-0 rounded-full p-1 transition hover:bg-black/10 dark:hover:bg-white/10" aria-label="Close notification">
+        <CloseIcon className="h-4 w-4" />
       </button>
     </motion.div>
   );
@@ -38,7 +38,7 @@ const NotificationHost = () => {
   };
 
   return createPortal(
-    <div className="fixed top-5 right-5 z-[9999] w-80">
+    <div className="pointer-events-none fixed z-[9999] mcm-safe-top-inset mcm-safe-x-inset sm:left-auto sm:w-full sm:max-w-sm sm:mcm-safe-top-inset-lg sm:mcm-safe-right-inset-lg">
       {notifications.map(n => (
         <Notification key={n.id} {...n} onDismiss={() => handleDismiss(n.id)} />
       ))}

@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import { UploadIcon, TrashIcon, PdfIcon, FileTextIcon, CloseIcon } from '../../components/UI/Icons';
-import { assignmentHelp } from '../../utils/api';
+import { assignmentHelp, primeMembership as primeMembershipApi } from '../../utils/api';
 import { getErrorMessage } from '../../utils/errorHandling/errorMessageUtils';
 
 const engineeringBranches = [
@@ -24,8 +24,51 @@ const TRUST_BADGES = [
   'Transparent pricing with deadline options',
 ];
 
+const DEFAULT_ASSIGNMENT_PRICING = {
+  Standard: {
+    label: 'Standard (7 days)',
+    eta: 'Balanced turnaround',
+    regularPrice: 149,
+    primePrice: 99,
+  },
+  Express: {
+    label: 'Express (3 days)',
+    eta: 'Priority queue delivery',
+    regularPrice: 249,
+    primePrice: 149,
+  },
+  Urgent: {
+    label: 'Urgent (24 hours)',
+    eta: 'Fast-track support',
+    regularPrice: 399,
+    primePrice: 249,
+  },
+};
+
+const normalizeTierPricing = (tierPayload, fallbackTier) => {
+  const regularPrice = Number(tierPayload?.regularPrice);
+  const primePrice = Number(tierPayload?.primePrice);
+
+  return {
+    label: tierPayload?.label || fallbackTier.label,
+    eta: tierPayload?.eta || fallbackTier.eta,
+    regularPrice: Number.isFinite(regularPrice) && regularPrice > 0
+      ? regularPrice
+      : fallbackTier.regularPrice,
+    primePrice: Number.isFinite(primePrice) && primePrice > 0
+      ? primePrice
+      : fallbackTier.primePrice,
+  };
+};
+
+const normalizeAssignmentPricing = (payload) => ({
+  Standard: normalizeTierPricing(payload?.Standard, DEFAULT_ASSIGNMENT_PRICING.Standard),
+  Express: normalizeTierPricing(payload?.Express, DEFAULT_ASSIGNMENT_PRICING.Express),
+  Urgent: normalizeTierPricing(payload?.Urgent, DEFAULT_ASSIGNMENT_PRICING.Urgent),
+});
+
 const PreviewModal = ({ file, onClose }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 mcm-safe-overlay-padding">
     <div className="relative max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800">
       <button
         onClick={onClose}
@@ -69,18 +112,7 @@ const AssignmentHelp = ({ selectedService, onNavigate }) => {
   const [deadline, setDeadline] = useState('Standard');
   const [previewFile, setPreviewFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const deadlineOptions = {
-    Standard: { label: 'Standard (7 days)', price: 149, eta: 'Balanced turnaround' },
-    Express: { label: 'Express (3 days)', price: 249, eta: 'Priority queue delivery' },
-    Urgent: { label: 'Urgent (24 hours)', price: 399, eta: 'Fast-track support' }
-  };
-
-  const primeDeadlineOptions = {
-    Standard: { label: 'Standard (7 days)', price: 99 },
-    Express: { label: 'Express (3 days)', price: 149 },
-    Urgent: { label: 'Urgent (24 hours)', price: 249 }
-  };
+  const [assignmentPricing, setAssignmentPricing] = useState(DEFAULT_ASSIGNMENT_PRICING);
 
   const handleFileChange = (e) => {
     if (e.target.files) {
@@ -116,6 +148,34 @@ const AssignmentHelp = ({ selectedService, onNavigate }) => {
     setBranch(selectedService.branch || engineeringBranches[0]);
     setSemester(String(selectedService.semester || '1'));
   }, [selectedService]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPricing = async () => {
+      try {
+        const response = await primeMembershipApi.getConfig();
+        if (cancelled) {
+          return;
+        }
+
+        const pricingPayload = response?.data?.assignmentPricing;
+        if (pricingPayload && typeof pricingPayload === 'object') {
+          setAssignmentPricing(normalizeAssignmentPricing(pricingPayload));
+        }
+      } catch {
+        if (!cancelled) {
+          setAssignmentPricing(DEFAULT_ASSIGNMENT_PRICING);
+        }
+      }
+    };
+
+    loadPricing();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const resetForm = () => {
     files.forEach(file => URL.revokeObjectURL(file.previewUrl));
@@ -208,8 +268,29 @@ const AssignmentHelp = ({ selectedService, onNavigate }) => {
 
   const INPUT_STYLE = 'w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 transition focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200';
 
-  const selectedDeadline = deadlineOptions[deadline];
-  const selectedPrimeDeadline = primeDeadlineOptions[deadline];
+  const deadlineOptions = useMemo(() => Object.fromEntries(
+    Object.entries(assignmentPricing).map(([key, value]) => [
+      key,
+      {
+        label: value.label,
+        price: value.regularPrice,
+        eta: value.eta,
+      },
+    ])
+  ), [assignmentPricing]);
+
+  const primeDeadlineOptions = useMemo(() => Object.fromEntries(
+    Object.entries(assignmentPricing).map(([key, value]) => [
+      key,
+      {
+        label: value.label,
+        price: value.primePrice,
+      },
+    ])
+  ), [assignmentPricing]);
+
+  const selectedDeadline = deadlineOptions[deadline] || deadlineOptions.Standard;
+  const selectedPrimeDeadline = primeDeadlineOptions[deadline] || primeDeadlineOptions.Standard;
   const payableAmount = state.user?.isPrimeMember ? selectedPrimeDeadline.price : selectedDeadline.price;
 
   return (

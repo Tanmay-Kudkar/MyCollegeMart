@@ -52,6 +52,13 @@ public class User {
     @Column(name = "shop_campus_location", length = 255)
     private String shopCampusLocation;
 
+    @Lob
+    @Column(name = "profile_image", columnDefinition = "BYTEA")
+    private byte[] profileImage;
+
+    @Column(name = "profile_image_content_type", length = 100)
+    private String profileImageContentType;
+
     // ✅ ADDED: A new field to store the unique Google User ID.
     // This is a more reliable identifier than email.
     @Column(name = "google_id")

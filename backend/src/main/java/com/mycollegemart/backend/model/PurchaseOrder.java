@@ -59,6 +59,27 @@ public class PurchaseOrder {
     private String razorpayPaymentId;
     private String razorpaySignature;
 
+    @Column(name = "tracking_number")
+    private String trackingNumber;
+
+    @Column(name = "carrier_name")
+    private String carrierName;
+
+    @Column(name = "carrier_contact")
+    private String carrierContact;
+
+    @Column(name = "current_location")
+    private String currentLocation;
+
+    @Column(name = "estimated_delivery_at")
+    private Instant estimatedDeliveryAt;
+
+    @Column(name = "delivered_at")
+    private Instant deliveredAt;
+
+    @Column(name = "last_tracking_update_at")
+    private Instant lastTrackingUpdateAt;
+
     @Column(columnDefinition = "TEXT")
     private String itemsJson;
 

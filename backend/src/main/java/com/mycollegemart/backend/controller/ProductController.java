@@ -46,14 +46,14 @@ public class ProductController {
     public ResponseEntity<?> addProduct(
             @RequestHeader(name = "Authorization", required = false) String authHeader,
             @RequestBody Product product) {
-        User merchant = resolveAuthenticatedMerchant(authHeader);
-        if (merchant == null) {
+        User listingManager = resolveAuthenticatedListingManager(authHeader);
+        if (listingManager == null) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message", "Only verified merchant accounts can list products"));
+                    .body(Map.of("message", "Verified merchant or admin access is required to list products"));
         }
 
         try {
-            product.setListedByUserId(merchant.getId());
+            product.setListedByUserId(listingManager.getId());
             return ResponseEntity.status(HttpStatus.CREATED).body(productService.addProduct(product));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
@@ -78,10 +78,10 @@ public class ProductController {
             @RequestParam(value = "externalVideoUrl", required = false) String externalVideoUrl,
             @RequestPart(value = "images", required = false) List<MultipartFile> imageFiles,
             @RequestPart(value = "videos", required = false) List<MultipartFile> videoFiles) {
-        User merchant = resolveAuthenticatedMerchant(authHeader);
-        if (merchant == null) {
+        User listingManager = resolveAuthenticatedListingManager(authHeader);
+        if (listingManager == null) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message", "Only verified merchant accounts can create listings"));
+                    .body(Map.of("message", "Verified merchant or admin access is required to create listings"));
         }
 
         Product product = new Product();
@@ -100,7 +100,7 @@ public class ProductController {
         product.setExternalVideoUrl(externalVideoUrl);
 
         try {
-            Product savedProduct = productService.addListing(product, merchant.getId(), imageFiles, videoFiles);
+            Product savedProduct = productService.addListing(product, listingManager.getId(), imageFiles, videoFiles);
             return ResponseEntity.status(HttpStatus.CREATED).body(savedProduct);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
@@ -112,14 +112,18 @@ public class ProductController {
             @RequestHeader(name = "Authorization", required = false) String authHeader,
             @PathVariable Long id,
             @RequestBody Product updates) {
-        User merchant = resolveAuthenticatedMerchant(authHeader);
-        if (merchant == null) {
+        User listingManager = resolveAuthenticatedListingManager(authHeader);
+        if (listingManager == null) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message", "Only verified merchant accounts can edit listings"));
+                    .body(Map.of("message", "Verified merchant or admin access is required to edit listings"));
         }
 
         try {
-            return ResponseEntity.ok(productService.updateListing(id, updates, merchant.getId()));
+            return ResponseEntity.ok(productService.updateListing(
+                    id,
+                    updates,
+                    listingManager.getId(),
+                    userService.isAdmin(listingManager)));
         } catch (IllegalArgumentException e) {
             if ("Product not found".equalsIgnoreCase(e.getMessage())) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
@@ -149,10 +153,10 @@ public class ProductController {
             @RequestParam(value = "externalVideoUrl", required = false) String externalVideoUrl,
             @RequestPart(value = "images", required = false) List<MultipartFile> imageFiles,
             @RequestPart(value = "videos", required = false) List<MultipartFile> videoFiles) {
-        User merchant = resolveAuthenticatedMerchant(authHeader);
-        if (merchant == null) {
+        User listingManager = resolveAuthenticatedListingManager(authHeader);
+        if (listingManager == null) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message", "Only verified merchant accounts can edit listings"));
+                    .body(Map.of("message", "Verified merchant or admin access is required to edit listings"));
         }
 
         Product updates = new Product();
@@ -172,7 +176,13 @@ public class ProductController {
 
         try {
             return ResponseEntity
-                    .ok(productService.updateListingWithMedia(id, updates, merchant.getId(), imageFiles, videoFiles));
+                    .ok(productService.updateListingWithMedia(
+                            id,
+                            updates,
+                            listingManager.getId(),
+                            userService.isAdmin(listingManager),
+                            imageFiles,
+                            videoFiles));
         } catch (IllegalArgumentException e) {
             if ("Product not found".equalsIgnoreCase(e.getMessage())) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
@@ -188,7 +198,7 @@ public class ProductController {
         return ResponseEntity.ok(productService.getListingMedia(id));
     }
 
-    private User resolveAuthenticatedMerchant(String authHeader) {
+    private User resolveAuthenticatedListingManager(String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return null;
         }
@@ -206,7 +216,7 @@ public class ProductController {
         }
 
         User user = userService.findById(userId);
-        if (user == null || !userService.canManageListings(user)) {
+        if (user == null || (!userService.canManageListings(user) && !userService.isAdmin(user))) {
             return null;
         }
 
