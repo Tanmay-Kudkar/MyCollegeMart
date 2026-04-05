@@ -348,8 +348,8 @@ Source: `backend/src/main/resources/application.properties`
 | JWT_SECRET | dev-only-secret-key-change-me-1234567890abcd | JWT signing secret |
 | JWT_EXPIRATION | 36000000 | JWT expiry (ms) |
 | APP_ADMIN_EMAILS | empty | Comma-separated admin email allow-list |
-| APP_MASTER_EMAIL | master@mycollegemart.local | Master account email |
-| APP_MASTER_PASSWORD | Master@1234 | Master account password |
+| APP_MASTER_EMAIL | master@mycollegemart.com | Master account email |
+| APP_MASTER_PASSWORD | mycollegemart | Master account password |
 
 ### Google OAuth
 
