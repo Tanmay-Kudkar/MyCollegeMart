@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { admin } from '../../utils/api';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
+import { getErrorMessage } from '../../utils/errorHandling/errorMessageUtils';
 
 const STATUS_OPTIONS = ['PENDING', 'APPROVED', 'REJECTED'];
 
@@ -25,7 +26,7 @@ const AdminMerchantPanel = ({ onNavigate }) => {
       dispatch({
         type: actionTypes.ADD_NOTIFICATION,
         payload: {
-          message: error?.response?.data?.message || error?.message || 'Failed to load merchant requests.',
+          message: getErrorMessage(error, 'Failed to load merchant requests.'),
           type: 'error',
         },
       });
@@ -67,7 +68,7 @@ const AdminMerchantPanel = ({ onNavigate }) => {
       dispatch({
         type: actionTypes.ADD_NOTIFICATION,
         payload: {
-          message: error?.response?.data?.message || error?.message || 'Failed to update merchant status.',
+          message: getErrorMessage(error, 'Failed to update merchant status.'),
           type: 'error',
         },
       });

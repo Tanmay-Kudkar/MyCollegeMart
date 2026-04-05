@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getErrorMessage } from './errorHandling/errorMessageUtils';
 
 const RAW_API_BASE_URL =
   import.meta.env.VITE_API_URL ||
@@ -160,19 +161,7 @@ const api = axios.create({
   }
 });
 
-const getApiErrorMessage = (error, fallbackMessage) => {
-  const payload = error?.response?.data;
-
-  if (typeof payload === 'string' && payload.trim()) {
-    return payload;
-  }
-
-  if (payload?.message && typeof payload.message === 'string') {
-    return payload.message;
-  }
-
-  return fallbackMessage;
-};
+const getApiErrorMessage = (error, fallbackMessage) => getErrorMessage(error, fallbackMessage);
 
 // Add auth token to requests
 api.interceptors.request.use(config => {
@@ -189,7 +178,7 @@ export const auth = {
       const response = await api.post('/auth/login', credentials);
       return response.data;
     } catch (error) {
-      throw new Error(getApiErrorMessage(error, "Login failed"));
+      throw new Error(getApiErrorMessage(error, 'Failed to sign in.'));
     }
   },
   register: async (userData) => {
@@ -197,7 +186,7 @@ export const auth = {
       const response = await api.post('/auth/register', userData);
       return response.data;
     } catch (error) {
-      throw new Error(getApiErrorMessage(error, "Registration failed"));
+      throw new Error(getApiErrorMessage(error, 'Failed to create account.'));
     }
   },
   getCurrentUser: async () => {
@@ -205,7 +194,7 @@ export const auth = {
       const response = await api.get('/auth/user');
       return response.data;
     } catch (error) {
-      throw new Error(getApiErrorMessage(error, "Failed to fetch user"));
+      throw new Error(getApiErrorMessage(error, 'Failed to fetch user profile.'));
     }
   },
   startGoogleLogin: () => {
@@ -219,7 +208,7 @@ export const auth = {
       const response = await api.post('/auth/account-type', { accountType });
       return response.data;
     } catch (error) {
-      throw new Error(getApiErrorMessage(error, "Failed to update account type"));
+      throw new Error(getApiErrorMessage(error, 'Failed to update account type.'));
     }
   },
   updateMerchantProfile: async (payload) => {
@@ -227,7 +216,7 @@ export const auth = {
       const response = await api.post('/auth/merchant-profile', payload);
       return response.data;
     } catch (error) {
-      throw new Error(getApiErrorMessage(error, "Failed to update merchant profile"));
+      throw new Error(getApiErrorMessage(error, 'Failed to update merchant profile.'));
     }
   },
 };
@@ -238,11 +227,11 @@ export const settings = {
 };
 
 export const ai = {
-  chat: async (payload) => {
+  chat: async (payload, config = {}) => {
     try {
-      return await api.post('/ai/chat', payload);
+      return await api.post('/ai/chat', payload, config);
     } catch (error) {
-      throw new Error(getApiErrorMessage(error, 'AI assistant request failed'));
+      throw new Error(getApiErrorMessage(error, 'AI assistant request failed.'));
     }
   }
 };

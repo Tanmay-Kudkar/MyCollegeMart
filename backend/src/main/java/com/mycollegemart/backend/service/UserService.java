@@ -34,6 +34,18 @@ public class UserService {
     public static final String MERCHANT_STATUS_APPROVED = "APPROVED";
     public static final String MERCHANT_STATUS_REJECTED = "REJECTED";
 
+    public enum PasswordAuthFailureReason {
+        ACCOUNT_NOT_FOUND,
+        WRONG_PASSWORD,
+        PASSWORD_LOGIN_NOT_AVAILABLE
+    }
+
+    public record PasswordAuthResult(User user, PasswordAuthFailureReason failureReason) {
+        public boolean isAuthenticated() {
+            return user != null;
+        }
+    }
+
     // ✅ BEST PRACTICE: Use 'final' and constructor injection instead of field
     // injection.
     // This makes the dependency explicit and the class easier to test.
@@ -118,20 +130,7 @@ public class UserService {
 
         Optional<User> existingUserOpt = userRepository.findByEmail(normalizedEmail);
         if (existingUserOpt.isPresent()) {
-            User existingUser = existingUserOpt.get();
-            if (hasPassword(existingUser)) {
-                throw new IllegalStateException("Email already registered.");
-            }
-
-            existingUser.setPassword(passwordEncoder.encode(rawPassword));
-            existingUser.setAccountType(normalizedAccountType);
-            existingUser.setMerchantVerificationStatus(resolveVerificationStatusForAccountType(
-                    normalizedAccountType,
-                    existingUser.getMerchantVerificationStatus()));
-            if (existingUser.getDisplayName() == null || existingUser.getDisplayName().isBlank()) {
-                existingUser.setDisplayName(extractDisplayName(normalizedEmail));
-            }
-            return userRepository.save(existingUser);
+            throw new IllegalStateException("Account already exists. Please sign in to continue.");
         }
 
         User newUser = new User();
@@ -145,17 +144,25 @@ public class UserService {
     }
 
     public User authenticateWithPassword(String email, String rawPassword) {
+        return authenticateWithPasswordDetailed(email, rawPassword).user();
+    }
+
+    public PasswordAuthResult authenticateWithPasswordDetailed(String email, String rawPassword) {
         Optional<User> userOpt = findByEmail(email);
         if (userOpt.isEmpty()) {
-            return null;
+            return new PasswordAuthResult(null, PasswordAuthFailureReason.ACCOUNT_NOT_FOUND);
         }
 
         User user = userOpt.get();
         if (!hasPassword(user)) {
-            return null;
+            return new PasswordAuthResult(null, PasswordAuthFailureReason.PASSWORD_LOGIN_NOT_AVAILABLE);
         }
 
-        return passwordEncoder.matches(rawPassword, user.getPassword()) ? user : null;
+        if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
+            return new PasswordAuthResult(null, PasswordAuthFailureReason.WRONG_PASSWORD);
+        }
+
+        return new PasswordAuthResult(user, null);
     }
 
     /**
@@ -257,6 +264,18 @@ public class UserService {
         }
 
         String normalizedAccountType = normalizeAccountType(accountType);
+        String currentAccountType = normalizeAccountType(user.getAccountType());
+
+        if (ACCOUNT_TYPE_MERCHANT.equals(currentAccountType)
+                && ACCOUNT_TYPE_INDIVIDUAL.equals(normalizedAccountType)) {
+            throw new IllegalStateException(
+                    "This account already has Business / Merchant access and cannot switch back to Individual.");
+        }
+
+        if (currentAccountType.equals(normalizedAccountType)) {
+            return user;
+        }
+
         user.setAccountType(normalizedAccountType);
         user.setMerchantVerificationStatus(resolveVerificationStatusForAccountType(
                 normalizedAccountType,

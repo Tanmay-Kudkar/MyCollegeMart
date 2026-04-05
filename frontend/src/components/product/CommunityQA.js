@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import { products } from '../../utils/api';
+import { getErrorMessage } from '../../utils/errorHandling/errorMessageUtils';
 
 const normalizeQuestions = (items) => {
     if (!Array.isArray(items)) {
@@ -152,8 +153,7 @@ const CommunityQA = ({ productId, sellerUserId, questions: initialQuestions = []
             setNewQuestion('');
             pushNotification('Question posted successfully!', 'success');
         } catch (error) {
-            const message = error?.response?.data?.message || 'Unable to post your question right now.';
-            pushNotification(message);
+            pushNotification(getErrorMessage(error, 'Unable to post your question right now.'));
         } finally {
             setIsAsking(false);
         }
@@ -198,8 +198,7 @@ const CommunityQA = ({ productId, sellerUserId, questions: initialQuestions = []
 
             pushNotification('Answer posted successfully!', 'success');
         } catch (error) {
-            const message = error?.response?.data?.message || 'Unable to post answer right now.';
-            pushNotification(message);
+            pushNotification(getErrorMessage(error, 'Unable to post answer right now.'));
         } finally {
             setAnsweringQuestionId(null);
         }

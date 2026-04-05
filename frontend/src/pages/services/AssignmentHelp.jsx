@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import { UploadIcon, TrashIcon, PdfIcon, FileTextIcon, CloseIcon } from '../../components/UI/Icons';
 import { assignmentHelp } from '../../utils/api';
+import { getErrorMessage } from '../../utils/errorHandling/errorMessageUtils';
 
 const engineeringBranches = [
   'All Branches',
@@ -191,7 +192,7 @@ const AssignmentHelp = ({ selectedService, onNavigate }) => {
 
       resetForm();
     } catch (error) {
-      const message = error?.response?.data?.message || error?.message || 'Failed to prepare payment. Please try again.';
+      const message = getErrorMessage(error, 'Failed to prepare payment. Please try again.');
       dispatch({
         type: actionTypes.ADD_NOTIFICATION,
         payload: { message, type: 'error' }

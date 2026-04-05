@@ -85,33 +85,61 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody AuthRequest request) {
         try {
-            User user = userService.authenticateWithPassword(request.email(), request.password());
-            if (user == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("message", "Invalid email or password"));
+            UserService.PasswordAuthResult authResult = userService.authenticateWithPasswordDetailed(
+                    request.email(),
+                    request.password());
+
+            if (!authResult.isAuthenticated()) {
+                return switch (authResult.failureReason()) {
+                    case ACCOUNT_NOT_FOUND -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                            .body(Map.of("message", "Account does not exist. Create account to continue."));
+                    case WRONG_PASSWORD -> ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                            .body(Map.of("message", "Wrong password. Please try again."));
+                    case PASSWORD_LOGIN_NOT_AVAILABLE -> ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                            .body(Map.of("message",
+                                    "This account uses Google sign-in. Continue with Google to sign in."));
+                    default -> ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                            .body(Map.of("message", "Unable to sign in with email/password."));
+                };
             }
+
+            User user = authResult.user();
 
             if (request.accountType() != null && !request.accountType().isBlank()) {
                 String requestedPortal = request.accountType().trim().toUpperCase();
+                if (!"MASTER".equals(requestedPortal)
+                        && !UserService.ACCOUNT_TYPE_MERCHANT.equals(requestedPortal)
+                        && !UserService.ACCOUNT_TYPE_INDIVIDUAL.equals(requestedPortal)) {
+                    return ResponseEntity.badRequest()
+                            .body(Map.of("message", "Unsupported portal selection."));
+                }
+
                 if ("MASTER".equals(requestedPortal)) {
                     if (!userService.isMaster(user)) {
                         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                                 .body(Map.of("message", "Master access is required for this portal."));
                     }
                 } else if (!userService.isMaster(user)) {
-                    String requestedType = userService.normalizeAccountType(request.accountType());
                     String userType = userService.normalizeAccountType(user.getAccountType());
-                    if (!requestedType.equals(userType)) {
+
+                    if (!requestedPortal.equals(userType)) {
+                        if (UserService.ACCOUNT_TYPE_MERCHANT.equals(userType)
+                                && UserService.ACCOUNT_TYPE_INDIVIDUAL.equals(requestedPortal)) {
+                            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                    .body(Map.of("message",
+                                            "This account is linked to Business / Merchant portal. Sign in using Business / Merchant."));
+                        }
+
+                        if (UserService.ACCOUNT_TYPE_INDIVIDUAL.equals(userType)
+                                && UserService.ACCOUNT_TYPE_MERCHANT.equals(requestedPortal)) {
+                            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                    .body(Map.of("message",
+                                            "This account is registered as Individual. Use Individual portal or request merchant access."));
+                        }
+
                         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                                 .body(Map.of("message", "This account is not registered for the selected portal."));
                     }
-                }
-
-                if (!"MASTER".equals(requestedPortal)
-                        && !"MERCHANT".equals(requestedPortal)
-                        && !"INDIVIDUAL".equals(requestedPortal)) {
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                            .body(Map.of("message", "Unsupported portal selection."));
                 }
             }
 
@@ -250,6 +278,8 @@ public class AuthController {
         try {
             User updatedUser = userService.updateAccountType(userId, request.accountType());
             return ResponseEntity.ok(buildUserResponse(updatedUser));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", e.getMessage()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }

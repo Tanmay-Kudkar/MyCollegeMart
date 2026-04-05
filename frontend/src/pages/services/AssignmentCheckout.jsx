@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ShieldCheckIcon, ArrowRightIcon } from '../../components/UI/Icons';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import { assignmentHelp } from '../../utils/api';
+import { getErrorMessage } from '../../utils/errorHandling/errorMessageUtils';
 
 const RAZORPAY_SCRIPT_URL = 'https://checkout.razorpay.com/v1/checkout.js';
 
@@ -24,7 +25,6 @@ const loadRazorpayScript = () => {
 const AssignmentCheckout = ({ onNavigate, checkoutData }) => {
   const { state, dispatch } = useGlobalState();
   const [paymentStatus, setPaymentStatus] = useState('idle');
-  const [checkoutError, setCheckoutError] = useState('');
   const [paymentInfo, setPaymentInfo] = useState(null);
 
   const amountDue = Number(checkoutData?.amountDue || 0);
@@ -41,17 +41,22 @@ const AssignmentCheckout = ({ onNavigate, checkoutData }) => {
     }
 
     if (!hasCheckoutData) {
-      setCheckoutError('Checkout session not found. Please submit the request again.');
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Checkout session not found. Please submit the request again.', type: 'error' },
+      });
       return;
     }
 
-    setCheckoutError('');
     setPaymentStatus('processing');
 
     const scriptLoaded = await loadRazorpayScript();
     if (!scriptLoaded) {
       setPaymentStatus('failed');
-      setCheckoutError('Unable to load Razorpay checkout. Please try again.');
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Unable to load Razorpay checkout. Please try again.', type: 'error' },
+      });
       return;
     }
 
@@ -91,20 +96,29 @@ const AssignmentCheckout = ({ onNavigate, checkoutData }) => {
           });
         } catch (error) {
           setPaymentStatus('failed');
-          setCheckoutError(error?.response?.data?.message || error?.message || 'Payment verification failed.');
+          dispatch({
+            type: actionTypes.ADD_NOTIFICATION,
+            payload: { message: getErrorMessage(error, 'Payment verification failed.'), type: 'error' },
+          });
         }
       },
       modal: {
         ondismiss: () => {
           setPaymentStatus('idle');
-          setCheckoutError('Payment was cancelled. Your request is still pending payment.');
+          dispatch({
+            type: actionTypes.ADD_NOTIFICATION,
+            payload: { message: 'Payment was cancelled. Your request is still pending payment.', type: 'error' },
+          });
         },
       },
     });
 
     razorpay.on('payment.failed', (response) => {
       setPaymentStatus('failed');
-      setCheckoutError(response?.error?.description || 'Payment failed. Please try again.');
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: response?.error?.description || 'Payment failed. Please try again.', type: 'error' },
+      });
     });
 
     razorpay.open();
@@ -198,10 +212,6 @@ const AssignmentCheckout = ({ onNavigate, checkoutData }) => {
               <span>₹{amountDue.toFixed(2)}</span>
             </div>
           </div>
-
-          {checkoutError && (
-            <p className="mt-4 text-sm text-rose-600 dark:text-rose-400">{checkoutError}</p>
-          )}
 
           <button
             onClick={handlePayment}

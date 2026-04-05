@@ -409,7 +409,14 @@ const AppContent = () => {
       case 'ProductDetail':
         return <ProductDetail product={selectedProduct} onNavigate={handleNavigate} />;
       case 'Login':
-        return <Login onNavigate={handleNavigate} defaultAccountType={params.accountType} />;
+        return (
+          <Login
+            onNavigate={handleNavigate}
+            defaultAccountType={params.accountType}
+            defaultEmail={params.email}
+            signupSuccessMessage={params.signupSuccessMessage}
+          />
+        );
       case 'Signup':
         return <Signup onNavigate={handleNavigate} defaultAccountType={params.accountType} />;
       case 'About':

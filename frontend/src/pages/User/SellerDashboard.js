@@ -37,6 +37,15 @@ const SellerDashboard = ({ onNavigate }) => {
     return allListings.filter((item) => Number(item?.listedByUserId) === currentUserId);
   }, [dashboard, state.user?.id]);
 
+  const activeListingsCount = useMemo(() => {
+    const fromApi = Number(dashboard?.activeListings);
+    if (Number.isFinite(fromApi) && fromApi >= 0) {
+      return fromApi;
+    }
+
+    return listings.length;
+  }, [dashboard?.activeListings, listings.length]);
+
   const unansweredQuestions = Number(dashboard?.unansweredQuestions || 0);
 
   if (!state.isLoggedIn) {
@@ -107,7 +116,7 @@ const SellerDashboard = ({ onNavigate }) => {
         </div>
         <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-center shadow-sm">
           <p className="text-sm text-slate-500 dark:text-slate-400">Active Listings</p>
-          <p className="text-3xl font-bold text-slate-800 dark:text-white">{listings.length}</p>
+          <p className="text-3xl font-bold text-slate-800 dark:text-white">{activeListingsCount}</p>
         </div>
         <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-center shadow-sm">
           <p className="text-sm text-slate-500 dark:text-slate-400">Seller Rating</p>
@@ -121,16 +130,20 @@ const SellerDashboard = ({ onNavigate }) => {
         </div>
       </div>
 
-      <h2 className="text-2xl font-bold mt-10 mb-4 text-slate-900 dark:text-white">My Listings</h2>
+      <div className="mt-10 mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">My Listings</h2>
+        <button
+          type="button"
+          onClick={() => onNavigate?.('Sell')}
+          className="w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 sm:w-auto"
+        >
+          Add Listing
+        </button>
+      </div>
+
       {listings.length === 0 ? (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
           <p className="text-slate-600 dark:text-slate-300">No listings available yet.</p>
-          <button
-            onClick={() => onNavigate?.('Sell')}
-            className="mt-4 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
-          >
-            Add First Listing
-          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

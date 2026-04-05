@@ -6,8 +6,8 @@ import googleIcon from '../../../assets/google-icon.svg';
 
 const INPUT_CLASS = 'mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:focus:ring-cyan-900/40';
 
-const Login = ({ onNavigate, defaultAccountType }) => {
-    const [email, setEmail] = useState('');
+const Login = ({ onNavigate, defaultAccountType, defaultEmail, signupSuccessMessage }) => {
+    const [email, setEmail] = useState(defaultEmail || '');
     const [password, setPassword] = useState('');
     const [accountType, setAccountType] = useState(
         (defaultAccountType || '').toUpperCase() === 'MASTER'
@@ -17,7 +17,7 @@ const Login = ({ onNavigate, defaultAccountType }) => {
                 : 'INDIVIDUAL'
     );
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState('');
+    const [notice, setNotice] = useState(signupSuccessMessage || '');
     const { dispatch } = useGlobalState();
 
     // This function for standard email/password login is correct.
@@ -25,7 +25,7 @@ const Login = ({ onNavigate, defaultAccountType }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
-        setError('');
+        setNotice('');
         try {
             const response = await auth.login({ email, password, accountType });
             localStorage.setItem('token', response.token);
@@ -38,15 +38,27 @@ const Login = ({ onNavigate, defaultAccountType }) => {
             onNavigate('Home');
         } catch (err) {
             console.error("Login error:", err);
-            setError(err.message || "Failed to sign in. Please check your credentials.");
+            dispatch({
+                type: actionTypes.ADD_NOTIFICATION,
+                payload: {
+                    message: err?.message || 'Failed to sign in. Please check your credentials.',
+                    type: 'error'
+                }
+            });
         }
         setIsLoading(false);
     };
 
     const handleGoogleSignIn = () => {
-        setError('');
+        setNotice('');
         if (accountType === 'MASTER') {
-            setError('Master portal supports secure email/password sign in only.');
+            dispatch({
+                type: actionTypes.ADD_NOTIFICATION,
+                payload: {
+                    message: 'Master portal supports secure email/password sign in only.',
+                    type: 'error'
+                }
+            });
             return;
         }
         auth.startGoogleLoginForAccountType(accountType);
@@ -72,18 +84,11 @@ const Login = ({ onNavigate, defaultAccountType }) => {
                     </div>
 
                     <div className="my-6 flex flex-1 items-center justify-center rounded-[30px] border border-slate-200/80 bg-gradient-to-br from-slate-100 via-white to-cyan-50 p-8 dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-cyan-950/40">
-                        <div className="relative">
-                            <div className="absolute -inset-7 rounded-full bg-cyan-400/15 blur-3xl dark:bg-cyan-500/20" aria-hidden="true" />
-                            <div className="relative h-56 w-56 rounded-full border-[6px] border-indigo-400/90 p-[6px] shadow-2xl shadow-cyan-900/20 dark:border-indigo-300/80">
-                                <div className="h-full w-full rounded-full border-[5px] border-amber-500 bg-white p-2">
-                                    <img
-                                        src="/MyCollegeMart-Icon.jpg"
-                                        alt="MyCollegeMart Logo"
-                                        className="h-full w-full rounded-full object-contain"
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                        <img
+                            src="/MyCollegeMart-Icon.jpg"
+                            alt="MyCollegeMart Logo"
+                            className="h-full w-full object-contain"
+                        />
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -104,7 +109,7 @@ const Login = ({ onNavigate, defaultAccountType }) => {
 
                     <div className="mt-6 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
                         <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Choose Portal</p>
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-2">
                             <button
                                 type="button"
                                 onClick={() => setAccountType('INDIVIDUAL')}
@@ -162,9 +167,9 @@ const Login = ({ onNavigate, defaultAccountType }) => {
                             />
                         </div>
 
-                        {error && (
-                            <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-800/40 dark:bg-rose-900/20 dark:text-rose-300">
-                                {error}
+                        {notice && (
+                            <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-900/20 dark:text-emerald-300">
+                                {notice}
                             </p>
                         )}
 

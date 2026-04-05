@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 import { TrashIcon, SparklesIcon, UploadIcon, CloseIcon } from '../../components/UI/Icons';
-import { products } from '../../utils/api';
+import { products, ai as aiApi } from '../../utils/api';
 import { ENGINEERING_BRANCHES, SEMESTERS, PRODUCT_CATEGORIES } from '../../utils/constants';
+import { getErrorMessage } from '../../utils/errorHandling/errorMessageUtils';
 
 const FALLBACK_SPEC_PLACEHOLDER = { id: 'custom', key: 'Specification', value: 'Value' };
 const MAX_IMAGES = 10;
@@ -52,6 +53,49 @@ const Sell = ({ onNavigate, pageParams = {} }) => {
   const editProductId = isEditMode ? Number(pageParams?.productId) : null;
 
   const branches = ENGINEERING_BRANCHES;
+
+  const normalizeAiDescription = (rawText) => {
+    const cleaned = String(rawText || '')
+      .replace(/\r/g, '')
+      .replace(/^\"|\"$/g, '')
+      .trim();
+
+    if (!cleaned) {
+      return '';
+    }
+
+    let lines = cleaned
+      .split('\n')
+      .map((line) => line.replace(/^[-*\u2022]\s*/, '').replace(/\s+/g, ' ').trim())
+      .filter(Boolean);
+
+    if (lines.length <= 1) {
+      const sentenceParts = cleaned
+        .split(/(?<=[.!?])\s+/)
+        .map((part) => part.replace(/\s+/g, ' ').trim())
+        .filter(Boolean);
+
+      if (sentenceParts.length > 1) {
+        lines = sentenceParts;
+      }
+    }
+
+    const contentLines = (lines.length ? lines : [cleaned]).slice(0, 2);
+    const branchKeyword = branch === 'All Branches' ? 'All Branches' : branch;
+    const semesterKeyword = semester === 'All' ? 'All Semesters' : `Semester ${semester}`;
+    const keywordLine = `Best for: ${branchKeyword}, ${semesterKeyword}.`;
+
+    const joinedLower = contentLines.join(' ').toLowerCase();
+    const hasBranchKeyword = joinedLower.includes(branchKeyword.toLowerCase());
+    const hasSemesterKeyword = joinedLower.includes(semesterKeyword.toLowerCase());
+
+    const finalLines = [...contentLines];
+    if (!hasBranchKeyword || !hasSemesterKeyword) {
+      finalLines.push(keywordLine);
+    }
+
+    return finalLines.slice(0, 3).join('\n');
+  };
   const semesters = SEMESTERS;
   const categories = PRODUCT_CATEGORIES;
 
@@ -310,7 +354,7 @@ const Sell = ({ onNavigate, pageParams = {} }) => {
         dispatch({
           type: actionTypes.ADD_NOTIFICATION,
           payload: {
-            message: error?.response?.data?.message || error?.message || 'Unable to load listing for editing.',
+            message: getErrorMessage(error, 'Unable to load listing for editing.'),
             type: 'error',
           },
         });
@@ -435,12 +479,73 @@ const Sell = ({ onNavigate, pageParams = {} }) => {
       });
       return;
     }
+
+    const highlightsList = highlights
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+
+    const specsSummary = specs
+      .map((spec) => {
+        const key = spec?.key?.trim();
+        const value = spec?.value?.trim();
+        return key && value ? `${key}: ${value}` : '';
+      })
+      .filter(Boolean)
+      .slice(0, 8)
+      .join('; ');
+
+    const prompt = [
+      'Generate a marketplace-ready product description for MyCollegeMart.',
+      'Return only the final description text (no headings, no markdown, no quotes).',
+      'Keep it concise, student-friendly, honest, and under 450 characters.',
+      'Output 2 to 3 short lines total.',
+      `Include these discoverability keywords naturally: ${branch === 'All Branches' ? 'All Branches' : branch}, ${semester === 'All' ? 'All Semesters' : `Semester ${semester}`}.`,
+      `Item name: ${itemName.trim()}`,
+      `Category: ${category}`,
+      `Branch: ${branch}`,
+      `Semester: ${semester}`,
+      `Price: ${price ? `INR ${price}` : 'Not provided'}`,
+      `Stock: ${inStock ? `In stock${stockQuantity ? ` (${stockQuantity})` : ''}` : 'Out of stock'}`,
+      `Highlights: ${highlightsList.length ? highlightsList.join('; ') : 'None provided'}`,
+      `Specifications: ${specsSummary || 'None provided'}`,
+      `Current draft: ${description.trim() || 'None'}`
+    ].join('\n');
+
     setIsGenerating(true);
-    // ... [API call logic remains the same] ...
-    setTimeout(() => { // Mocking the API call
-      setDescription(`This ${itemName} is a must-have for any student in the ${category} course. It's in great condition and will surely help you succeed!`);
+
+    try {
+      const response = await aiApi.chat({
+        assistantType: 'MARKETMATE',
+        message: prompt,
+        history: [],
+      });
+
+      const generatedText = response?.data?.reply?.trim();
+
+      if (!generatedText) {
+        throw new Error('AI returned an empty description. Please try again.');
+      }
+
+      const normalizedDescription = normalizeAiDescription(generatedText);
+      if (!normalizedDescription) {
+        throw new Error('AI returned an invalid description. Please try again.');
+      }
+
+      setDescription(normalizedDescription);
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Description generated with AI.', type: 'success' }
+      });
+    } catch (error) {
+      const message = error?.message || 'Unable to generate description right now.';
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message, type: 'error' }
+      });
+    } finally {
       setIsGenerating(false);
-    }, 1500);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -612,12 +717,12 @@ const Sell = ({ onNavigate, pageParams = {} }) => {
 
       onNavigate('Marketplace');
     } catch (error) {
-      const message = error?.response?.data?.message
-        || error?.message
-        || (isEditMode ? 'Failed to update listing.' : 'Failed to create listing.');
       dispatch({
         type: actionTypes.ADD_NOTIFICATION,
-        payload: { message, type: 'error' }
+        payload: {
+          message: getErrorMessage(error, isEditMode ? 'Failed to update listing.' : 'Failed to create listing.'),
+          type: 'error'
+        }
       });
     } finally {
       setIsSubmitting(false);

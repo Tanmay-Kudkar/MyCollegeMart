@@ -4,9 +4,10 @@ import { useGlobalState, actionTypes } from '../../context/GlobalStateContext';
 
 const Notification = ({ notification, onRemove }) => {
   useEffect(() => {
-    const timer = setTimeout(() => onRemove(notification.id), 2500); // faster auto-dismiss
+    const autoDismissMs = notification.type === 'error' ? 4500 : 2500;
+    const timer = setTimeout(() => onRemove(notification.id), autoDismissMs);
     return () => clearTimeout(timer);
-  }, [notification.id, onRemove]);
+  }, [notification.id, notification.type, onRemove]);
 
   const isSuccess = notification.type === 'success';
 

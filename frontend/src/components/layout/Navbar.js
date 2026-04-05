@@ -159,6 +159,7 @@ const Navbar = ({ onCartClick, onNavigate }) => {
     { name: t('nav.home'), page: 'Home' },
     { name: t('nav.marketplace'), page: 'Marketplace' },
     { name: t('nav.skills'), page: 'SkillMarketplace' },
+    { name: 'Study Corner', page: 'StudyCorner' },
     { name: 'Assignment Help', page: 'AssignmentHelp' },
     { name: t('nav.about'), page: 'About' },
     { name: t('nav.contact'), page: 'Contact' }
@@ -285,15 +286,11 @@ const Navbar = ({ onCartClick, onNavigate }) => {
               title="Home"
             >
               <span className="mr-3 inline-flex items-center justify-center">
-                <span className="inline-flex h-[46px] w-[46px] items-center justify-center rounded-full border-[3px] border-indigo-400/90 p-[2px] dark:border-indigo-300/80">
-                  <span className="inline-flex h-full w-full items-center justify-center rounded-full border-2 border-amber-500 bg-white p-[1px]">
-                    <img
-                      src="/MyCollegeMart-Icon.jpg"
-                      alt="MyCollegeMart Icon"
-                      className="h-full w-full rounded-full object-cover"
-                    />
-                  </span>
-                </span>
+                <img
+                  src="/MyCollegeMart-Icon.jpg"
+                  alt="MyCollegeMart Icon"
+                  className="h-[46px] w-[46px] rounded-full object-cover"
+                />
               </span>
               {/* Neutral brand wordmark (no dot, no blue) */}
               <span className="brand-wordmark hidden text-[22px] font-semibold tracking-tight text-slate-900 dark:text-white sm:inline md:text-[26px]">

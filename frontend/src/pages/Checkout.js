@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useGlobalState, actionTypes } from '../context/GlobalStateContext';
 import { ShieldCheckIcon, ArrowRightIcon } from '../components/UI/Icons';
 import { checkout as checkoutApi } from '../utils/api';
+import { getErrorMessage } from '../utils/errorHandling/errorMessageUtils';
 
 const RAZORPAY_SCRIPT_URL = 'https://checkout.razorpay.com/v1/checkout.js';
 
@@ -43,7 +44,6 @@ const Checkout = ({ onNavigate }) => {
   const [deliveryOption, setDeliveryOption] = useState('Library Pickup Point');
   const [useWallet, setUseWallet] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('online');
-  const [checkoutError, setCheckoutError] = useState('');
 
   const cartItems = useMemo(() => Object.values(state.cart.items), [state.cart.items]);
   const cartTotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
@@ -140,23 +140,32 @@ const Checkout = ({ onNavigate }) => {
           finalizeSuccessfulCheckout(verifyResponse.data, razorpayResponse.razorpay_payment_id);
         } catch (error) {
           setPaymentStatus('failed');
-          setCheckoutError(error?.response?.data?.message || error?.message || 'Payment verification failed.');
+          dispatch({
+            type: actionTypes.ADD_NOTIFICATION,
+            payload: { message: getErrorMessage(error, 'Payment verification failed.'), type: 'error' },
+          });
         }
       },
       modal: {
         ondismiss: () => {
           setPaymentStatus('idle');
-          setCheckoutError('Payment was cancelled.');
+          dispatch({
+            type: actionTypes.ADD_NOTIFICATION,
+            payload: { message: 'Payment was cancelled.', type: 'error' },
+          });
         },
       },
     });
 
     razorpay.on('payment.failed', (response) => {
       setPaymentStatus('failed');
-      setCheckoutError(
-        response?.error?.description ||
-        'Payment failed. Please try another payment method.'
-      );
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: {
+          message: response?.error?.description || 'Payment failed. Please try another payment method.',
+          type: 'error',
+        },
+      });
     });
 
     razorpay.open();
@@ -184,11 +193,13 @@ const Checkout = ({ onNavigate }) => {
     }
 
     if (checkoutItems.length === 0) {
-      setCheckoutError('Your cart is empty.');
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: 'Your cart is empty.', type: 'error' },
+      });
       return;
     }
 
-    setCheckoutError('');
     setPaymentStatus('processing');
 
     try {
@@ -199,7 +210,10 @@ const Checkout = ({ onNavigate }) => {
       }
     } catch (error) {
       setPaymentStatus('failed');
-      setCheckoutError(error?.response?.data?.message || error?.message || 'Unable to process checkout.');
+      dispatch({
+        type: actionTypes.ADD_NOTIFICATION,
+        payload: { message: getErrorMessage(error, 'Unable to process checkout.'), type: 'error' },
+      });
     } finally {
       if (paymentStatus !== 'success') {
         setPaymentStatus((prev) => (prev === 'success' ? prev : 'idle'));
@@ -386,10 +400,6 @@ const Checkout = ({ onNavigate }) => {
               />
               <span className="ml-3 font-medium text-slate-800 dark:text-slate-200">Use Student Wallet (Balance: ₹{walletBalance.toFixed(2)})</span>
             </label>
-
-            {checkoutError && (
-              <p className="mt-4 text-sm text-rose-600 dark:text-rose-400">{checkoutError}</p>
-            )}
 
             <button
               onClick={handlePayment}
